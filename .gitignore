@@ -1,0 +1,8 @@
+bin/
+obj/
+dist/
+*.user
+Directory.Build.user.props
+.vs/
+*.dll
+*.pdb

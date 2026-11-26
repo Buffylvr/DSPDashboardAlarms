@@ -1,0 +1,179 @@
+using System.Collections.Generic;
+using System.IO;
+
+namespace DashboardAlarms
+{
+    /// <summary>Which number of the watched dashboard chart the alarm looks at.</summary>
+    public enum AlarmMetric
+    {
+        Production = 0,   // items produced per minute
+        Consumption = 1,  // items consumed per minute
+        Net = 2,          // production - consumption per minute
+        Stock = 3,        // items held in storage (storage charts only)
+    }
+
+    public enum AlarmTrigger
+    {
+        Below = 0,        // value < threshold
+        Above = 1,        // value > threshold
+        DropPercent = 2,  // value has fallen dropPercent % below its recent average
+    }
+
+    public enum AlarmState
+    {
+        Normal = 0,       // condition not met
+        Pending = 1,      // condition met, waiting out the hold time
+        Alarming = 2,     // flashing + sound
+        Acknowledged = 3, // still in alarm, silenced until the condition clears
+        Snoozed = 4,      // fully suppressed until snoozeUntilTick
+    }
+
+    /// <summary>One alarm, attached to one dashboard stat plan. Saved with the game.</summary>
+    public class AlarmDefinition
+    {
+        // ---- identity of the stat plan it watches (validated on load so a recycled id is not misattached)
+        public int statPlanId;
+        public int planType;
+        public int itemId;
+        public int astroFilter;
+
+        // ---- settings
+        public bool enabled = true;
+        public AlarmMetric metric = AlarmMetric.Production;
+        public AlarmTrigger trigger = AlarmTrigger.Below;
+        public double threshold;
+        public double dropPercent = 20;
+        public float averageMinutes = 10f;
+        public float holdSeconds = 30f;
+        public bool playSound = true;
+        public string sound = Sounds.Default;
+        public float repeatSoundSeconds = 30f; // 0 = sound once per alarm
+        public float snoozeMinutes = 10f;      // default length the Snooze button uses
+
+        // ---- runtime (not saved)
+        public AlarmState state;
+        public long conditionSinceTick = -1;
+        public long snoozeUntilTick;
+        public long lastSoundTick = -1;
+        public double lastValue = double.NaN;
+        public double lastAverage = double.NaN;
+        public bool hasValue;
+        public readonly RollingAverage history = new RollingAverage();
+
+        public bool IsRaised => state == AlarmState.Alarming || state == AlarmState.Acknowledged;
+
+        public const int SaveVersion = 1;
+
+        public void Write(BinaryWriter w)
+        {
+            w.Write(SaveVersion);
+            w.Write(statPlanId);
+            w.Write(planType);
+            w.Write(itemId);
+            w.Write(astroFilter);
+            w.Write(enabled);
+            w.Write((int)metric);
+            w.Write((int)trigger);
+            w.Write(threshold);
+            w.Write(dropPercent);
+            w.Write(averageMinutes);
+            w.Write(holdSeconds);
+            w.Write(playSound);
+            w.Write(sound ?? Sounds.Default);
+            w.Write(repeatSoundSeconds);
+            w.Write(snoozeMinutes);
+        }
+
+        public static AlarmDefinition Read(BinaryReader r)
+        {
+            int version = r.ReadInt32();
+            var a = new AlarmDefinition
+            {
+                statPlanId = r.ReadInt32(),
+                planType = r.ReadInt32(),
+                itemId = r.ReadInt32(),
+                astroFilter = r.ReadInt32(),
+                enabled = r.ReadBoolean(),
+                metric = (AlarmMetric)r.ReadInt32(),
+                trigger = (AlarmTrigger)r.ReadInt32(),
+                threshold = r.ReadDouble(),
+                dropPercent = r.ReadDouble(),
+                averageMinutes = r.ReadSingle(),
+                holdSeconds = r.ReadSingle(),
+                playSound = r.ReadBoolean(),
+                sound = r.ReadString(),
+                repeatSoundSeconds = r.ReadSingle(),
+                snoozeMinutes = r.ReadSingle(),
+            };
+            // future versions append fields here, guarded by `version`
+            _ = version;
+            return a;
+        }
+
+        /// <summary>After an edit: drop alarm state and hold timer but keep the sample history.</summary>
+        public void ResetRuntimeTimersOnly()
+        {
+            state = AlarmState.Normal;
+            conditionSinceTick = -1;
+            snoozeUntilTick = 0;
+            lastSoundTick = -1;
+        }
+
+        public void ResetRuntime()
+        {
+            state = AlarmState.Normal;
+            conditionSinceTick = -1;
+            snoozeUntilTick = 0;
+            lastSoundTick = -1;
+            lastValue = double.NaN;
+            lastAverage = double.NaN;
+            hasValue = false;
+            history.Clear();
+        }
+    }
+
+    /// <summary>Time-stamped samples kept for the "drop from average" trigger.</summary>
+    public class RollingAverage
+    {
+        private readonly Queue<KeyValuePair<long, double>> samples = new Queue<KeyValuePair<long, double>>();
+        private double sum;
+
+        public int Count => samples.Count;
+
+        public void Clear()
+        {
+            samples.Clear();
+            sum = 0;
+        }
+
+        public void Add(long tick, double value, long windowTicks)
+        {
+            samples.Enqueue(new KeyValuePair<long, double>(tick, value));
+            sum += value;
+            while (samples.Count > 0 && samples.Peek().Key < tick - windowTicks)
+            {
+                sum -= samples.Dequeue().Value;
+            }
+        }
+
+        /// <summary>Span in ticks covered by the samples held.</summary>
+        public long Span(long nowTick) => samples.Count == 0 ? 0 : nowTick - samples.Peek().Key;
+
+        public double Mean => samples.Count == 0 ? double.NaN : sum / samples.Count;
+    }
+
+    public static class Sounds
+    {
+        public const string Default = "warning-popup-1";
+
+        /// <summary>Built-in game sounds offered in the alarm window (audio name, label).</summary>
+        public static readonly string[,] Options =
+        {
+            { "warning-popup-1", "Warning popup" },
+            { "warning-popup-0", "Tutorial warning" },
+            { "df-alarm", "Dark Fog alarm" },
+            { "ui-error", "UI error" },
+            { "research-complete", "Research complete" },
+        };
+    }
+}
