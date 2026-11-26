@@ -1,6 +1,6 @@
 # Builds the plugin and packages it for Thunderstore into dist/<Team>-<Name>-<version>.zip.
-# Usage: powershell -ExecutionPolicy Bypass -File package.ps1 [-Team Buffylvr]
-param([string]$Team = "Buffylvr")
+# Usage: powershell -ExecutionPolicy Bypass -File package.ps1 [-Team buffy5490]
+param([string]$Team = "buffy5490")
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
