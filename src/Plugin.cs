@@ -16,7 +16,7 @@ namespace DashboardAlarms
     {
         public const string Guid = "buffylvr.dsp.dashboardalarms";
         public const string Name = "Dashboard Alarms";
-        public const string Version = "0.6.2";
+        public const string Version = "0.6.3";
 
         internal static ManualLogSource Log;
         internal static float UiScale = 1f;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3
+- Fix: the last banner button ("Remove...") was pushed past the right edge and clipped; the line width now counts
+  the margins around each button.
+- Confirmed in game: Edit, Snooze, Unsnooze and Remove work; Settings > Audio rows show correctly.
+
 ## 0.6.2
 - Banner lines have an **Edit** button that opens the alarm's settings.
 - **Snooze all** only shows when two or more alarms are going off (with one it repeated the line's Snooze).

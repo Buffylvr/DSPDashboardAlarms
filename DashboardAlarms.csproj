@@ -9,7 +9,7 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
     <!-- Game and BepInEx locations. Override on the command line or in a Directory.Build.user.props, e.g.
          dotnet build -p:DSPDir="D:\Games\Dyson Sphere Program" -p:BepInExDir="...\profiles\Default\BepInEx" -->
     <DSPDir Condition="'$(DSPDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Dyson Sphere Program</DSPDir>

@@ -359,8 +359,16 @@ namespace DashboardAlarms
             $"Delete this alarm? It stops watching {AlarmManager.Describe(a)} and won't sound again. "
             + "The chart stays on your dashboard. To be warned again later, add a new alarm from the chart's menu.";
 
-        private static float RowButtonsWidth(GUIStyle button, AlarmDefinition a) =>
-            ButtonWidth(button, RowAction(a)) + 6 + ButtonWidth(button, EditLabel) + 6 + ButtonWidth(button, RemoveAsk);
+        /// <summary>
+        /// Width taken by a line's three buttons, including the margins GUILayout puts around every control
+        /// (label margin + each button's margin + our 6px spaces), so the last button never runs past the edge.
+        /// </summary>
+        private static float RowButtonsWidth(GUIStyle button, AlarmDefinition a)
+        {
+            float buttons = ButtonWidth(button, RowAction(a)) + ButtonWidth(button, EditLabel) + ButtonWidth(button, RemoveAsk);
+            float margins = 3 * button.margin.horizontal + bannerLineStyle.margin.horizontal;
+            return buttons + margins + 3 * 6 + 4; // 3 spaces (label|snooze|edit|remove) + a little slack
+        }
 
         private const string EditLabel = "Edit";
         private const string SnoozeAllLabel = "Snooze all";
