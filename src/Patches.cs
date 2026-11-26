@@ -102,7 +102,7 @@ namespace DashboardAlarms
             AlarmDefinition a = AlarmManager.Find(chart.chartData.statPlanId);
             Transform existing = chart.rectTrans.Find(ObjectName);
             AlarmState state = a != null && a.enabled ? a.state : AlarmState.Normal;
-            bool show = state == AlarmState.Pending || state == AlarmState.Alarming || state == AlarmState.Acknowledged;
+            bool show = state == AlarmState.Pending || state == AlarmState.Alarming || state == AlarmState.Snoozed;
             if (!show)
             {
                 if (existing != null && existing.gameObject.activeSelf)
@@ -123,9 +123,9 @@ namespace DashboardAlarms
             {
                 c = new Color(1f, 0.7f, 0.1f, 0.8f);
             }
-            else if (state == AlarmState.Acknowledged)
+            else if (state == AlarmState.Snoozed)
             {
-                c = new Color(1f, 0.15f, 0.1f, 0.75f);
+                c = new Color(1f, 0.15f, 0.1f, 0.45f); // snoozed: steady, dimmer red
             }
             else
             {

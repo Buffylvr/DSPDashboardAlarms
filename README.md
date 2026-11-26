@@ -45,11 +45,14 @@ Number fields accept `300000`, `300,000`, `300k`, `1.5M` and `2G`.
 - The chart's border flashes red on the dashboard. It shows amber while the hold time is running.
 - A red banner at the top of the screen lists every raised alarm and its current value.
 - The built-in game sounds you picked play (one or more, together), and repeat every N seconds if you set a repeat interval.
-- **Ack** silences the alarm and stops the flashing until the value recovers. If it breaks the
-  rule again after that, it alarms again.
-- **Snooze** silences the alarm completely for its snooze length. If the rule is still broken
-  when the snooze ends, it alarms again.
-- **Ack all**, **Snooze all** and **List** are on the banner.
+- **Snooze** silences the alarm for its snooze length, which is set per alarm. There's no way to mute an alarm for
+  good, so an alarm can't be silenced and forgotten:
+  - While snoozed, the alarm stays in the banner, dimmed, with a countdown, and its chart border turns a
+    steady dim red.
+  - If the value recovers during the snooze, the alarm clears.
+  - If the value is still bad when the snooze ends, the alarm sounds again right away.
+  - **Unsnooze** ends a snooze early.
+- **Snooze all** and **List** are on the banner.
 
 ## Using it
 

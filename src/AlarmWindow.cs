@@ -34,6 +34,7 @@ namespace DashboardAlarms
         private static GUIStyle bannerStyle;
         private static GUIStyle wrapLabel;
         private static GUIStyle bannerLineStyle;
+        private static GUIStyle bannerSnoozedStyle;
 
         public static bool EditorOpen => editing != null;
 
@@ -47,7 +48,7 @@ namespace DashboardAlarms
                 m /= s;
                 return (editing != null && editorRect.Contains(m))
                     || (listOpen && listRect.Contains(m))
-                    || (AlarmManager.RaisedCount > 0 && bannerRect.Contains(m));
+                    || (AlarmManager.ShownCount > 0 && bannerRect.Contains(m));
             }
         }
 
@@ -70,7 +71,7 @@ namespace DashboardAlarms
             {
                 activeRects.Add(listRect);
             }
-            if (AlarmManager.RaisedCount > 0 && bannerRect.width > 0)
+            if (AlarmManager.ShownCount > 0 && bannerRect.width > 0)
             {
                 activeRects.Add(bannerRect);
             }
@@ -189,74 +190,81 @@ namespace DashboardAlarms
             wrapLabel = new GUIStyle(GUI.skin.label) { wordWrap = true };
             bannerLineStyle = new GUIStyle(GUI.skin.label) { wordWrap = true, fontSize = 14 };
             bannerLineStyle.normal.textColor = Color.white;
+            bannerSnoozedStyle = new GUIStyle(bannerLineStyle) { fontStyle = FontStyle.Italic };
+            bannerSnoozedStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
         }
 
         // ---------------------------------------------------------------- banner
 
         private static void DrawBanner()
         {
-            int raised = AlarmManager.RaisedCount;
-            if (raised == 0)
+            int total = AlarmManager.ShownCount;
+            if (total == 0)
             {
                 bannerRect = Rect.zero;
                 return;
             }
+            int alarming = AlarmManager.RaisedCount;
+            int snoozed = total - alarming;
+
             // Size everything from the real text so nothing is cut off at any UI scale or font.
             const float pad = 8;
             const float gap = 6;
             float w = Mathf.Min(760, Screen.width / Scale - 40);
             float inner = w - 2 * pad;
             GUIStyle button = GUI.skin.button;
-            GUIStyle label = bannerLineStyle;
-            float ackW = ButtonWidth(button, "Ack");
 
-            int shown = Math.Min(raised, 5);
+            // alarming first, then snoozed; at most 5 lines
+            int shown = Math.Min(total, 5);
             var lines = new List<KeyValuePair<AlarmDefinition, string>>();
-            float rowsH = 0;
-            foreach (AlarmDefinition a in AlarmManager.Alarms)
+            for (int pass = 0; pass < 2; pass++)
             {
-                if (!a.IsRaised || lines.Count >= shown)
+                foreach (AlarmDefinition a in AlarmManager.Alarms)
                 {
-                    continue;
+                    bool wanted = pass == 0 ? a.state == AlarmState.Alarming : a.state == AlarmState.Snoozed;
+                    if (!wanted || lines.Count >= shown)
+                    {
+                        continue;
+                    }
+                    string mark = a.state == AlarmState.Snoozed ? $"(snoozed, {FormatDuration(AlarmManager.SnoozeSecondsLeft(a))} left)  " : "";
+                    lines.Add(new KeyValuePair<AlarmDefinition, string>(a, $"{mark}{AlarmManager.Describe(a)}  -  now {AlarmManager.FormatValue(a, a.lastValue)}"));
                 }
-                string mark = a.state == AlarmState.Acknowledged ? "(acknowledged) " : "";
-                string text = $"{mark}{AlarmManager.Describe(a)}  -  now {AlarmManager.FormatValue(a, a.lastValue)}";
-                lines.Add(new KeyValuePair<AlarmDefinition, string>(a, text));
-                float labelW = inner - ackW - ButtonWidth(button, SnoozeLabel(a)) - 2 * gap;
-                rowsH += Mathf.Max(button.CalcHeight(new GUIContent("Ack"), ackW), label.CalcHeight(new GUIContent(text), labelW)) + gap;
+            }
+            float rowsH = 0;
+            foreach (KeyValuePair<AlarmDefinition, string> line in lines)
+            {
+                string action = RowAction(line.Key);
+                float labelW = inner - ButtonWidth(button, action) - gap;
+                rowsH += Mathf.Max(button.CalcHeight(new GUIContent(action), 80), LineStyle(line.Key).CalcHeight(new GUIContent(line.Value), labelW)) + gap;
             }
             float headerH = button.CalcHeight(new GUIContent("List"), 60) + gap;
-            float moreH = raised > shown ? label.CalcHeight(new GUIContent("x"), inner) : 0;
+            float moreH = total > shown ? bannerLineStyle.CalcHeight(new GUIContent("x"), inner) : 0;
             float h = pad + headerH + rowsH + moreH + pad;
             bannerRect = new Rect((Screen.width / Scale - w) / 2, 70, w, h);
 
-            bool anyAlarming = false;
-            foreach (AlarmDefinition a in AlarmManager.Alarms)
-            {
-                if (a.state == AlarmState.Alarming)
-                {
-                    anyAlarming = true;
-                    break;
-                }
-            }
-            float pulse = anyAlarming ? 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.realtimeSinceStartup * 4f)) : 0.45f;
+            // flashing red while anything is alarming; steady and dimmer when everything is snoozed
             Color oldBg = GUI.backgroundColor;
-            GUI.backgroundColor = new Color(0.9f, 0.1f, 0.1f, pulse);
+            GUI.backgroundColor = alarming > 0
+                ? new Color(0.9f, 0.1f, 0.1f, 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.realtimeSinceStartup * 4f)))
+                : new Color(0.55f, 0.15f, 0.15f, 0.6f);
             GUI.Box(bannerRect, "", bannerStyle);
             GUI.Box(bannerRect, "", bannerStyle);
             GUI.backgroundColor = oldBg;
 
             GUILayout.BeginArea(new Rect(bannerRect.x + pad, bannerRect.y + pad, inner, h - 2 * pad));
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"{raised} dashboard alarm{(raised == 1 ? "" : "s")}", label, GUILayout.ExpandWidth(true));
-            if (GUILayout.Button("Ack all", GUILayout.Width(ButtonWidth(button, "Ack all"))))
+            string title = alarming > 0 ? $"{alarming} dashboard alarm{(alarming == 1 ? "" : "s")}" : "Dashboard alarms";
+            if (snoozed > 0)
             {
-                AlarmManager.AcknowledgeAll();
+                title += $" ({snoozed} snoozed)";
             }
+            GUILayout.Label(title, bannerLineStyle, GUILayout.ExpandWidth(true));
+            GUI.enabled = alarming > 0;
             if (GUILayout.Button("Snooze all", GUILayout.Width(ButtonWidth(button, "Snooze all"))))
             {
                 AlarmManager.SnoozeAllRaised();
             }
+            GUI.enabled = true;
             if (GUILayout.Button("List", GUILayout.Width(ButtonWidth(button, "List"))))
             {
                 ToggleList();
@@ -267,30 +275,41 @@ namespace DashboardAlarms
             foreach (KeyValuePair<AlarmDefinition, string> line in lines)
             {
                 AlarmDefinition a = line.Key;
-                string snooze = SnoozeLabel(a);
-                float labelW = inner - ackW - ButtonWidth(button, snooze) - 2 * gap;
+                string action = RowAction(a);
+                float labelW = inner - ButtonWidth(button, action) - gap;
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(line.Value, label, GUILayout.Width(labelW));
+                GUILayout.Label(line.Value, LineStyle(a), GUILayout.Width(labelW));
                 GUILayout.Space(gap);
-                GUI.enabled = a.state == AlarmState.Alarming;
-                if (GUILayout.Button("Ack", GUILayout.Width(ackW)))
+                if (GUILayout.Button(action, GUILayout.Width(ButtonWidth(button, action))))
                 {
-                    AlarmManager.Acknowledge(a);
-                }
-                GUI.enabled = true;
-                GUILayout.Space(gap);
-                if (GUILayout.Button(snooze, GUILayout.Width(ButtonWidth(button, snooze))))
-                {
-                    AlarmManager.Snooze(a, a.snoozeMinutes);
+                    if (a.state == AlarmState.Snoozed)
+                    {
+                        AlarmManager.Unsnooze(a);
+                    }
+                    else
+                    {
+                        AlarmManager.Snooze(a, a.snoozeMinutes);
+                    }
                 }
                 GUILayout.EndHorizontal();
                 GUILayout.Space(gap);
             }
-            if (raised > shown)
+            if (total > shown)
             {
-                GUILayout.Label($"...and {raised - shown} more (List shows all)", label);
+                GUILayout.Label($"...and {total - shown} more (List shows all)", bannerLineStyle);
             }
             GUILayout.EndArea();
+        }
+
+        /// <summary>The one button on a banner line: Snooze while alarming, Unsnooze while snoozed.</summary>
+        private static string RowAction(AlarmDefinition a) => a.state == AlarmState.Snoozed ? "Unsnooze" : SnoozeLabel(a);
+
+        private static GUIStyle LineStyle(AlarmDefinition a) => a.state == AlarmState.Snoozed ? bannerSnoozedStyle : bannerLineStyle;
+
+        private static string FormatDuration(float seconds)
+        {
+            int s = Mathf.CeilToInt(seconds);
+            return s >= 60 ? $"{s / 60}:{s % 60:00}" : $"{s}s";
         }
 
         private static string SnoozeLabel(AlarmDefinition a) => $"Snooze {a.snoozeMinutes:0.#} min";
@@ -595,6 +614,10 @@ namespace DashboardAlarms
                 if (a.IsRaised && GUILayout.Button("Snooze", GUILayout.Width(ButtonWidth(GUI.skin.button, "Snooze"))))
                 {
                     AlarmManager.Snooze(a, a.snoozeMinutes);
+                }
+                if (a.state == AlarmState.Snoozed && GUILayout.Button("Unsnooze", GUILayout.Width(ButtonWidth(GUI.skin.button, "Unsnooze"))))
+                {
+                    AlarmManager.Unsnooze(a);
                 }
                 if (GUILayout.Button("Edit", GUILayout.Width(ButtonWidth(GUI.skin.button, "Edit"))))
                 {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+- **Ack removed.** Snooze is the only way to silence an alarm, and it is always time-limited, so an alarm can't be
+  silenced and forgotten. Snoozed alarms stay in the banner (dimmed, with a countdown) and the chart border turns a
+  steady dim red. A snoozed alarm clears if the value recovers, and alarms again as soon as the snooze ends if it
+  hasn't. **Unsnooze** ends a snooze early.
+
 ## 0.4.0
 - Alarm volume defaults to **50%** and is adjustable in the game's Settings > Audio tab ("Dashboard alarm volume"
   slider with a **Test** button), next to the "play with sound off" checkbox. A note under them says they come from

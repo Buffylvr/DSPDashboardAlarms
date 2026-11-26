@@ -16,7 +16,7 @@ internal static class Program
         DipShorterThanHoldDoesNotFire();
         PercentDropFromAverage();
         PercentDropNeedsWarmup();
-        AcknowledgeSilencesUntilCleared();
+        SnoozeClearsWhenFixed();
         SnoozeSuppressesThenReturns();
         DisabledAlarmStaysQuiet();
         SaveRoundTrip();
@@ -126,28 +126,42 @@ internal static class Program
         Check("drop: no alarm before half the average window has data", a.state == AlarmState.Normal);
     }
 
-    private static void AcknowledgeSilencesUntilCleared()
+    private static void SnoozeClearsWhenFixed()
     {
         AlarmDefinition a = New(AlarmTrigger.Below, 100, 0);
         AlarmManager.Evaluate(a, 0, 10);
-        AlarmManager.Acknowledge(a);
+        AlarmManager.Snooze(a, 10, 0);
         AlarmManager.Evaluate(a, 2 * S, 10);
-        Check("ack: stays acknowledged while condition holds", a.state == AlarmState.Acknowledged);
+        Check("snooze: shown in banner while snoozed", a.IsShown && !a.IsRaised);
         AlarmManager.Evaluate(a, 4 * S, 200);
-        Check("ack: clears to normal", a.state == AlarmState.Normal);
+        Check("snooze: value recovers during snooze -> normal", a.state == AlarmState.Normal && !a.IsShown, a.state.ToString());
         AlarmManager.Evaluate(a, 6 * S, 10);
-        Check("ack: a new occurrence alarms again", a.state == AlarmState.Alarming);
+        Check("snooze: a new occurrence alarms again", a.state == AlarmState.Alarming, a.state.ToString());
     }
 
     private static void SnoozeSuppressesThenReturns()
     {
-        AlarmDefinition a = New(AlarmTrigger.Below, 100, 0);
+        AlarmDefinition a = New(AlarmTrigger.Below, 100, 60); // 60s hold must not delay the return
         AlarmManager.Evaluate(a, 0, 10);
-        AlarmManager.Snooze(a, 1, 0);
-        AlarmManager.Evaluate(a, 30 * S, 10);
+        AlarmManager.Evaluate(a, 60 * S, 10);
+        Check("snooze: alarming before snooze", a.state == AlarmState.Alarming, a.state.ToString());
+        AlarmManager.Snooze(a, 1, 60 * S);
+        AlarmManager.Evaluate(a, 90 * S, 10);
         Check("snooze: suppressed during snooze", a.state == AlarmState.Snoozed);
-        AlarmManager.Evaluate(a, 61 * S, 10);
-        Check("snooze: alarms again after it ends", a.state == AlarmState.Alarming, a.state.ToString());
+        AlarmManager.Evaluate(a, 121 * S, 10);
+        Check("snooze: alarms again right after it ends (no new hold)", a.state == AlarmState.Alarming, a.state.ToString());
+
+        AlarmDefinition b = New(AlarmTrigger.Below, 100, 0);
+        AlarmManager.Evaluate(b, 0, 10);
+        AlarmManager.Snooze(b, 10, 0);
+        AlarmManager.Unsnooze(b, 2 * S);
+        AlarmManager.Evaluate(b, 2 * S, 10);
+        Check("snooze: unsnooze alarms again at once", b.state == AlarmState.Alarming, b.state.ToString());
+
+        AlarmDefinition c = New(AlarmTrigger.Below, 100, 30);
+        AlarmManager.Evaluate(c, 0, 10); // pending, not alarming yet
+        AlarmManager.Snooze(c, 10, 0);
+        Check("snooze: only an alarming alarm can be snoozed", c.state == AlarmState.Pending, c.state.ToString());
     }
 
     private static void DisabledAlarmStaysQuiet()

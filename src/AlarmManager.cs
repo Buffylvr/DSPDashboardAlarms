@@ -218,11 +218,25 @@ namespace DashboardAlarms
 
             if (a.state == AlarmState.Snoozed)
             {
-                if (now < a.snoozeUntilTick)
+                if (!condition)
+                {
+                    // the problem went away during the snooze: done, drop it from the banner
+                    a.state = AlarmState.Normal;
+                    a.conditionSinceTick = -1;
+                    return;
+                }
+                if (now >= a.snoozeUntilTick)
+                {
+                    // snooze over and still broken: alarm again right away (it was already held long enough)
+                    a.state = AlarmState.Alarming;
+                    a.lastSoundTick = -1;
+                    a.conditionSinceTick = now - holdTicks;
+                    Plugin.Log?.LogInfo($"Snooze ended, still alarming: {Describe(a)} (value {Format(a.lastValue)})");
+                }
+                else
                 {
                     return;
                 }
-                a.state = AlarmState.Normal;
             }
 
             if (!condition)
@@ -253,8 +267,6 @@ namespace DashboardAlarms
                     }
                     break;
                 case AlarmState.Alarming:
-                    break;
-                case AlarmState.Acknowledged:
                     break;
             }
 
@@ -294,28 +306,53 @@ namespace DashboardAlarms
             }
         }
 
-        public static void Acknowledge(AlarmDefinition a)
+        public static void Snooze(AlarmDefinition a, float minutes) => Snooze(a, minutes, GameMain.gameTick);
+
+        /// <summary>Silences an alarming alarm for a while. Always time-limited: there is no permanent mute.</summary>
+        internal static void Snooze(AlarmDefinition a, float minutes, long now)
         {
-            if (a.state == AlarmState.Alarming)
+            if (a.state != AlarmState.Alarming && a.state != AlarmState.Snoozed)
             {
-                a.state = AlarmState.Acknowledged;
+                return;
+            }
+            a.state = AlarmState.Snoozed;
+            a.snoozeUntilTick = now + (long)(Math.Max(0.1f, minutes) * 60f * TicksPerSecond);
+        }
+
+        /// <summary>Ends a snooze early: alarms again on the next check if the problem is still there.</summary>
+        public static void Unsnooze(AlarmDefinition a) => Unsnooze(a, GameMain.gameTick);
+
+        internal static void Unsnooze(AlarmDefinition a, long now)
+        {
+            if (a.state == AlarmState.Snoozed)
+            {
+                a.snoozeUntilTick = now;
             }
         }
 
-        public static void Snooze(AlarmDefinition a, float minutes) => Snooze(a, minutes, GameMain.gameTick);
-
-        internal static void Snooze(AlarmDefinition a, float minutes, long now)
+        /// <summary>Seconds of snooze left (game time), 0 when not snoozed.</summary>
+        public static float SnoozeSecondsLeft(AlarmDefinition a)
         {
-            a.state = AlarmState.Snoozed;
-            a.snoozeUntilTick = now + (long)(Math.Max(0.1f, minutes) * 60f * TicksPerSecond);
-            a.conditionSinceTick = -1;
+            if (a.state != AlarmState.Snoozed)
+            {
+                return 0;
+            }
+            return Math.Max(0, a.snoozeUntilTick - GameMain.gameTick) / (float)TicksPerSecond;
         }
 
-        public static void AcknowledgeAll()
+        public static int ShownCount
         {
-            foreach (AlarmDefinition a in Alarms)
+            get
             {
-                Acknowledge(a);
+                int n = 0;
+                foreach (AlarmDefinition a in Alarms)
+                {
+                    if (a.IsShown)
+                    {
+                        n++;
+                    }
+                }
+                return n;
             }
         }
 

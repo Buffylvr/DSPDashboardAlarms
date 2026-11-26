@@ -26,8 +26,7 @@ namespace DashboardAlarms
         Normal = 0,       // condition not met
         Pending = 1,      // condition met, waiting out the hold time
         Alarming = 2,     // flashing + sound
-        Acknowledged = 3, // still in alarm, silenced until the condition clears
-        Snoozed = 4,      // fully suppressed until snoozeUntilTick
+        Snoozed = 4,      // silenced until snoozeUntilTick; still listed (dimmed) in the banner, cleared if the value recovers
     }
 
     public static class Metrics
@@ -92,7 +91,11 @@ namespace DashboardAlarms
         public bool isDraft;
         public readonly RollingAverage history = new RollingAverage();
 
-        public bool IsRaised => state == AlarmState.Alarming || state == AlarmState.Acknowledged;
+        /// <summary>Actively alarming (sound + flashing).</summary>
+        public bool IsRaised => state == AlarmState.Alarming;
+
+        /// <summary>Listed in the banner: alarming, or snoozed while the problem is still there.</summary>
+        public bool IsShown => state == AlarmState.Alarming || state == AlarmState.Snoozed;
 
         /// <summary>1: single sound. 2: list of sounds.</summary>
         public const int SaveVersion = 2;
