@@ -1,8 +1,8 @@
 {
   "name": "DashboardAlarms",
-  "version_number": "0.7.2",
+  "version_number": "1.0.0",
   "website_url": "https://github.com/Buffylvr/DSPDashboardAlarms",
-  "description": "Alarms on Dashboard production/storage charts: threshold or % drop, hold time, flashing border, banner, sound, ack and snooze.",
+  "description": "Alarms for Dashboard charts: watch production, consumption, max production, use % of max or stock; alarm above/below a value or on a % drop, with chart flash, banner, game sounds (even with sound off) and snooze.",
   "dependencies": [
     "xiaoye97-BepInEx-5.4.17",
     "CommonAPI-DSPModSave-1.2.2"

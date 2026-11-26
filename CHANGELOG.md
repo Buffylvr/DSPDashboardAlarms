@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+- First public release (Thunderstore). Everything below has been tested in game on 0.10.35.29151.
+- README rewritten for players; Thunderstore icon.
+
 ## 0.7.2
 - Fix: wrapped text (the delete confirmation, long alarm lines, the editor's notes) was clipped with the game's
   font, because Unity under-measures wrapped text in that font. Lines are now counted word by word.
