@@ -4,9 +4,10 @@ Adds alarms to the in-game **Dashboard**. Choose a production or storage chart, 
 the mod warns you with a flashing chart border, a banner at the top of the screen and a game
 sound when the rule is broken. The banner and sound work even when the dashboard is closed.
 
-> **Status: v0.2.0, early testing.** The chart menu entry and the alarm window have been seen
-> working in game (game version 0.10.35.29151). Alarm firing, the banner, sounds and saving are
-> still being tested in game. The alarm logic passes offline tests. Please report problems.
+> **Status: v0.6.3, tested in game** (game version 0.10.35.29151). All of these have been confirmed in game:
+> creating and editing alarms from the chart menu, use % of max production, alarms firing, the banner with
+> Snooze, Unsnooze, Edit and Remove, sounds with the game's sound off, the Settings > Audio checkbox, volume and
+> Test, and saving with the game. Please report problems.
 
 ## What you can watch
 
