@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.IO;
 using DashboardAlarms;
 
@@ -244,7 +245,7 @@ internal static class Program
         try
         {
             // Resolve each patch's target the same way Harmony does, without detouring anything.
-            foreach (var m in typeof(Patches).GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+            foreach (var m in Array.ConvertAll(new[] { typeof(Patches), typeof(OptionsToggle) }, t => t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)).SelectMany(x => x))
             {
                 var attrs = m.GetCustomAttributes(typeof(HarmonyLib.HarmonyPatch), false);
                 if (attrs.Length == 0)

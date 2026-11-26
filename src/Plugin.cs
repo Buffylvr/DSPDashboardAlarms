@@ -16,7 +16,7 @@ namespace DashboardAlarms
     {
         public const string Guid = "buffylvr.dsp.dashboardalarms";
         public const string Name = "Dashboard Alarms";
-        public const string Version = "0.2.3";
+        public const string Version = "0.3.0";
 
         internal static ManualLogSource Log;
         internal static float UiScale = 1f;
@@ -24,19 +24,39 @@ namespace DashboardAlarms
         private ConfigEntry<float> sampleSeconds;
         private ConfigEntry<float> stockRefreshSeconds;
         private ConfigEntry<float> alarmVolume;
+        private ConfigEntry<bool> playWithSoundOff;
         private ConfigEntry<float> uiScale;
+
+        private static Plugin instance;
+
+        /// <summary>Alarms ignore the game's volume sliders (default on).</summary>
+        internal static bool PlayWithSoundOff = true;
+
+        internal static void SetPlayWithSoundOff(bool value)
+        {
+            PlayWithSoundOff = value;
+            if (instance != null && instance.playWithSoundOff.Value != value)
+            {
+                instance.playWithSoundOff.Value = value; // saved to the config file
+            }
+        }
         private ConfigEntry<KeyboardShortcut> listHotkey;
         private Harmony harmony;
 
         private void Awake()
         {
             Log = Logger;
+            instance = this;
             sampleSeconds = Config.Bind("General", "SampleSeconds", 2f,
                 "How often (seconds) every alarm checks its chart's value.");
             stockRefreshSeconds = Config.Bind("General", "StockRefreshSeconds", 30f,
                 "How often (seconds) stock and max-production alarms ask the game to recount storage and machines. The game counts one planet per tick, so lower values cost more CPU on big saves. Minimum 5.");
             alarmVolume = Config.Bind("Sound", "AlarmVolume", 1f,
-                "Alarm sound volume, 0 to 1. Multiplied by the game's Game Master Volume only, so alarms are heard even with the game's Sound Effects slider off.");
+                "Alarm sound volume, 0 to 1.");
+            playWithSoundOff = Config.Bind("Sound", "PlayWithSoundOff", true,
+                "true: alarms play at AlarmVolume even when the game's master or sound effects volume is turned down or off. "
+                + "false: alarms follow the game's Game Master x Sound Effects volume (silent when effects are off). "
+                + "Also shown as a checkbox in the game's Settings > Audio tab.");
             uiScale = Config.Bind("UI", "Scale", 1f, "Scale of the alarm windows and banner.");
             listHotkey = Config.Bind("UI", "AlarmListHotkey", new KeyboardShortcut(KeyCode.A, KeyCode.LeftControl, KeyCode.LeftShift),
                 "Opens/closes the list of all dashboard alarms.");
@@ -45,6 +65,7 @@ namespace DashboardAlarms
 
             harmony = new Harmony(Guid);
             harmony.PatchAll(typeof(Patches));
+            harmony.PatchAll(typeof(OptionsToggle));
             Log.LogInfo($"{Name} {Version} loaded");
         }
 
@@ -53,6 +74,7 @@ namespace DashboardAlarms
             AlarmManager.SampleSeconds = Mathf.Max(0.5f, sampleSeconds.Value);
             AlarmManager.StockRefreshSeconds = Mathf.Max(5f, stockRefreshSeconds.Value);
             AlarmManager.AlarmVolume = Mathf.Clamp01(alarmVolume.Value);
+            PlayWithSoundOff = playWithSoundOff.Value;
             UiScale = Mathf.Clamp(uiScale.Value, 0.5f, 3f);
         }
 

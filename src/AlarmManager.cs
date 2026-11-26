@@ -344,7 +344,7 @@ namespace DashboardAlarms
             if (diagnose)
             {
                 Plugin.Log?.LogInfo($"Sound test: {names.Count} sound(s) [{string.Join(", ", names.ToArray())}]; "
-                    + $"alarm volume {AlarmVolume:0.##} x game master {VFAudio.audioVolume:0.##} (game effects slider {VFAudio.soundVolume:0.##} is not used); "
+                    + $"alarm volume {AlarmVolume:0.##}, play with sound off {Plugin.PlayWithSoundOff}, game master {VFAudio.audioVolume:0.##}, game effects {VFAudio.soundVolume:0.##}, final x{GameVolumeFactor():0.##}; "
                     + $"listener volume {AudioListener.volume:0.##}, background mute {VFAudio.backgroundMute}, focused {Application.isFocused}");
             }
             foreach (string n in names)
@@ -383,7 +383,7 @@ namespace DashboardAlarms
                     return;
                 }
                 AudioSource src = EnsureSource();
-                float volume = Mathf.Clamp01(AlarmVolume) * Mathf.Clamp01(VFAudio.audioVolume) * (proto.Volume > 0 ? proto.Volume : 1f);
+                float volume = Mathf.Clamp01(AlarmVolume) * GameVolumeFactor() * (proto.Volume > 0 ? proto.Volume : 1f);
                 src.PlayOneShot(clip, volume);
                 if (diagnose)
                 {
@@ -394,6 +394,12 @@ namespace DashboardAlarms
             {
                 Plugin.Log?.LogWarning($"Could not play sound '{name}': {e.GetType().Name}: {e.Message}");
             }
+        }
+
+        /// <summary>1 when alarms play through muted game audio; otherwise the game's master x sound effects volume.</summary>
+        internal static float GameVolumeFactor()
+        {
+            return Plugin.PlayWithSoundOff ? 1f : Mathf.Clamp01(VFAudio.audioVolume) * Mathf.Clamp01(VFAudio.soundVolume);
         }
 
         private static AudioSource EnsureSource()

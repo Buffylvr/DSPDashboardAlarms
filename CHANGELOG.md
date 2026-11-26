@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+- New checkbox in the game's **Settings > Audio** tab: "Dashboard alarms play with sound off" (on by default).
+  On: alarms play at `Sound.AlarmVolume` even with the game's master or sound effects volume down or off.
+  Off: alarms follow the game's Game Master x Sound Effects volume. Saved on Apply; also `Sound.PlayWithSoundOff` in the config.
+
 ## 0.2.3
 - Banner sized from its text: long alarm lines wrap onto extra lines and the banner grows to fit; buttons are
   as wide as their labels. Same for the list window's buttons ("X" is now "Delete").
