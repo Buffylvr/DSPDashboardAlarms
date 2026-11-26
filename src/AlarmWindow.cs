@@ -217,6 +217,7 @@ namespace DashboardAlarms
             if (total == 0)
             {
                 bannerRect = Rect.zero;
+                bannerContentH = 0; // start from the estimate next time it appears
                 return;
             }
             int alarming = AlarmManager.RaisedCount;
@@ -265,7 +266,9 @@ namespace DashboardAlarms
             }
             float headerH = button.CalcHeight(new GUIContent("List"), 60) + gap;
             float moreH = total > shown ? bannerLineStyle.CalcHeight(new GUIContent("x"), inner) : 0;
-            float h = pad + headerH + rowsH + moreH + pad;
+            float estimate = headerH + rowsH + moreH;
+            // measured height from the last frame wins; the estimate only covers the very first frame
+            float h = pad + (bannerContentH > 0 ? bannerContentH : estimate) + pad;
             bannerRect = new Rect((Screen.width / Scale - w) / 2, 70, w, h);
 
             // flashing red while anything is alarming; steady and dimmer when everything is snoozed
@@ -284,7 +287,8 @@ namespace DashboardAlarms
             GUI.DrawTexture(new Rect(bannerRect.x, bannerRect.y, 4, bannerRect.height), Texture2D.whiteTexture);
             GUI.color = oldColor;
 
-            GUILayout.BeginArea(new Rect(bannerRect.x + pad, bannerRect.y + pad, inner, h - 2 * pad));
+            // the layout area is taller than the panel so content is never clipped while the size catches up
+            GUILayout.BeginArea(new Rect(bannerRect.x + pad, bannerRect.y + pad, inner, Mathf.Max(h, estimate + 2 * pad) + 400));
             GUILayout.BeginHorizontal();
             string title = alarming > 0 ? $"{alarming} dashboard alarm{(alarming == 1 ? "" : "s")}" : "Dashboard alarms";
             if (snoozed > 0)
@@ -309,7 +313,7 @@ namespace DashboardAlarms
                 AlarmDefinition a = line.Key;
                 if (a == confirmRemove)
                 {
-                    GUILayout.Label(RemoveQuestion(a), bannerLineStyle, GUILayout.Width(inner));
+                    GUILayout.Label(RemoveQuestion(a), bannerLineStyle, GUILayout.Width(inner - bannerLineStyle.margin.horizontal));
                     GUILayout.Space(gap);
                     GUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
@@ -368,8 +372,18 @@ namespace DashboardAlarms
             {
                 GUILayout.Label($"...and {total - shown} more (List shows all)", bannerLineStyle);
             }
+            // Measure where the content really ended (GUILayout adds margins the estimate can't see);
+            // the next frame sizes the panel from this.
+            GUILayout.Label(GUIContent.none, GUIStyle.none, GUILayout.Height(1));
+            if (Event.current.type == EventType.Repaint)
+            {
+                bannerContentH = GUILayoutUtility.GetLastRect().yMax;
+            }
             GUILayout.EndArea();
         }
+
+        /// <summary>Height of the banner's content as last drawn (0 until the first repaint).</summary>
+        private static float bannerContentH;
 
         // Removing an alarm from the banner: a two-step "Remove..." -> "Delete alarm" / "Keep" so one stray click can't do it.
         private const string RemoveAsk = "Remove...";

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+- Fix: with several alarms, the "Delete this alarm?" confirmation was cut off at the bottom of the banner. The
+  banner now sizes itself from the height its content actually took, not an estimate.
+
 ## 0.7.0
 - The alarm editor, alarm list and banner are restyled to match the game's UI: the game's own font, dark
   translucent navy panels with a title band and cyan rule, cyan-edged flat buttons with hover/pressed states,
