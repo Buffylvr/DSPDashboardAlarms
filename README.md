@@ -52,6 +52,9 @@ Number fields accept `300000`, `300,000`, `300k`, `1.5M` and `2G`.
   - If the value recovers during the snooze, the alarm clears.
   - If the value is still bad when the snooze ends, the alarm sounds again right away.
   - **Unsnooze** ends a snooze early.
+- **Remove...** (on each banner line) deletes the alarm after you confirm with **Delete alarm**. **Keep** backs out.
+  The chart itself stays on your dashboard; only the alarm is removed. To be warned again, add a new alarm from
+  the chart's menu.
 - **Snooze all** and **List** are on the banner.
 
 ## Using it

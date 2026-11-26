@@ -231,11 +231,22 @@ namespace DashboardAlarms
                 }
             }
             float rowsH = 0;
+            bool confirmShown = false;
             foreach (KeyValuePair<AlarmDefinition, string> line in lines)
             {
-                string action = RowAction(line.Key);
-                float labelW = inner - ButtonWidth(button, action) - gap;
-                rowsH += Mathf.Max(button.CalcHeight(new GUIContent(action), 80), LineStyle(line.Key).CalcHeight(new GUIContent(line.Value), labelW)) + gap;
+                if (line.Key == confirmRemove)
+                {
+                    confirmShown = true;
+                    rowsH += bannerLineStyle.CalcHeight(new GUIContent(RemoveQuestion(line.Key)), inner) + gap
+                        + button.CalcHeight(new GUIContent(RemoveYes), 80) + gap;
+                    continue;
+                }
+                float labelW = inner - RowButtonsWidth(button, line.Key) - gap;
+                rowsH += Mathf.Max(button.CalcHeight(new GUIContent("x"), 80), LineStyle(line.Key).CalcHeight(new GUIContent(line.Value), labelW)) + gap;
+            }
+            if (!confirmShown)
+            {
+                confirmRemove = null; // its alarm cleared or scrolled out: forget the question
             }
             float headerH = button.CalcHeight(new GUIContent("List"), 60) + gap;
             float moreH = total > shown ? bannerLineStyle.CalcHeight(new GUIContent("x"), inner) : 0;
@@ -275,8 +286,32 @@ namespace DashboardAlarms
             foreach (KeyValuePair<AlarmDefinition, string> line in lines)
             {
                 AlarmDefinition a = line.Key;
+                if (a == confirmRemove)
+                {
+                    GUILayout.Label(RemoveQuestion(a), bannerLineStyle, GUILayout.Width(inner));
+                    GUILayout.Space(gap);
+                    GUILayout.BeginHorizontal();
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button(RemoveYes, GUILayout.Width(ButtonWidth(button, RemoveYes))))
+                    {
+                        AlarmManager.Remove(a);
+                        if (editing == a)
+                        {
+                            CloseEditor(false);
+                        }
+                        confirmRemove = null;
+                    }
+                    GUILayout.Space(gap);
+                    if (GUILayout.Button(RemoveNo, GUILayout.Width(ButtonWidth(button, RemoveNo))))
+                    {
+                        confirmRemove = null;
+                    }
+                    GUILayout.EndHorizontal();
+                    GUILayout.Space(gap);
+                    continue;
+                }
                 string action = RowAction(a);
-                float labelW = inner - ButtonWidth(button, action) - gap;
+                float labelW = inner - RowButtonsWidth(button, a) - gap;
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(line.Value, LineStyle(a), GUILayout.Width(labelW));
                 GUILayout.Space(gap);
@@ -291,6 +326,11 @@ namespace DashboardAlarms
                         AlarmManager.Snooze(a, a.snoozeMinutes);
                     }
                 }
+                GUILayout.Space(gap);
+                if (GUILayout.Button(RemoveAsk, GUILayout.Width(ButtonWidth(button, RemoveAsk))))
+                {
+                    confirmRemove = a;
+                }
                 GUILayout.EndHorizontal();
                 GUILayout.Space(gap);
             }
@@ -300,6 +340,19 @@ namespace DashboardAlarms
             }
             GUILayout.EndArea();
         }
+
+        // Removing an alarm from the banner: a two-step "Remove..." -> "Delete alarm" / "Keep" so one stray click can't do it.
+        private const string RemoveAsk = "Remove...";
+        private const string RemoveYes = "Delete alarm";
+        private const string RemoveNo = "Keep";
+        private static AlarmDefinition confirmRemove;
+
+        private static string RemoveQuestion(AlarmDefinition a) =>
+            $"Delete this alarm? It stops watching {AlarmManager.Describe(a)} and won't sound again. "
+            + "The chart stays on your dashboard. To be warned again later, add a new alarm from the chart's menu.";
+
+        private static float RowButtonsWidth(GUIStyle button, AlarmDefinition a) =>
+            ButtonWidth(button, RowAction(a)) + 6 + ButtonWidth(button, RemoveAsk);
 
         /// <summary>The one button on a banner line: Snooze while alarming, Unsnooze while snoozed.</summary>
         private static string RowAction(AlarmDefinition a) => a.state == AlarmState.Snoozed ? "Unsnooze" : SnoozeLabel(a);

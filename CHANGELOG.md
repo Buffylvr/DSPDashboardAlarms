@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+- Banner lines have a **Remove...** button. It asks "Delete this alarm? ..." with **Delete alarm** / **Keep**,
+  so a stray click can't remove an alarm. The dashboard chart is not touched.
+
 ## 0.5.0
 - **Ack removed.** Snooze is the only way to silence an alarm, and it is always time-limited, so an alarm can't be
   silenced and forgotten. Snoozed alarms stay in the banner (dimmed, with a countdown) and the chart border turns a
