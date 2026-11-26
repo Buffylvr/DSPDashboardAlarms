@@ -55,7 +55,9 @@ Number fields accept `300000`, `300,000`, `300k`, `1.5M` and `2G`.
 - **Remove...** (on each banner line) deletes the alarm after you confirm with **Delete alarm**. **Keep** backs out.
   The chart itself stays on your dashboard; only the alarm is removed. To be warned again, add a new alarm from
   the chart's menu.
-- **Snooze all** and **List** are on the banner.
+- **Edit** (on each banner line) opens that alarm's settings.
+- **Snooze all** (shown when two or more alarms are going off) snoozes every one of them, each for its own snooze
+  length. **List** opens the list of all alarms.
 
 ## Using it
 

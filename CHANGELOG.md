@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+- Banner lines have an **Edit** button that opens the alarm's settings.
+- **Snooze all** only shows when two or more alarms are going off (with one it repeated the line's Snooze).
+
 ## 0.6.1
 - Fix: the Settings > Audio options never appeared. The Audio tab keeps labels and controls in two separate
   columns ("labels" and "comps"); rows are now built by copying the label and the control into their own columns

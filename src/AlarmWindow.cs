@@ -270,12 +270,11 @@ namespace DashboardAlarms
                 title += $" ({snoozed} snoozed)";
             }
             GUILayout.Label(title, bannerLineStyle, GUILayout.ExpandWidth(true));
-            GUI.enabled = alarming > 0;
-            if (GUILayout.Button("Snooze all", GUILayout.Width(ButtonWidth(button, "Snooze all"))))
+            // only useful with two or more alarms going off; with one it would just repeat that line's Snooze
+            if (alarming >= 2 && GUILayout.Button(SnoozeAllLabel, GUILayout.Width(ButtonWidth(button, SnoozeAllLabel))))
             {
                 AlarmManager.SnoozeAllRaised();
             }
-            GUI.enabled = true;
             if (GUILayout.Button("List", GUILayout.Width(ButtonWidth(button, "List"))))
             {
                 ToggleList();
@@ -327,6 +326,15 @@ namespace DashboardAlarms
                     }
                 }
                 GUILayout.Space(gap);
+                if (GUILayout.Button(EditLabel, GUILayout.Width(ButtonWidth(button, EditLabel))))
+                {
+                    StatPlan plan = AlarmManager.ResolvePlan(GameMain.data, a);
+                    if (plan != null)
+                    {
+                        OpenEditor(plan);
+                    }
+                }
+                GUILayout.Space(gap);
                 if (GUILayout.Button(RemoveAsk, GUILayout.Width(ButtonWidth(button, RemoveAsk))))
                 {
                     confirmRemove = a;
@@ -352,7 +360,10 @@ namespace DashboardAlarms
             + "The chart stays on your dashboard. To be warned again later, add a new alarm from the chart's menu.";
 
         private static float RowButtonsWidth(GUIStyle button, AlarmDefinition a) =>
-            ButtonWidth(button, RowAction(a)) + 6 + ButtonWidth(button, RemoveAsk);
+            ButtonWidth(button, RowAction(a)) + 6 + ButtonWidth(button, EditLabel) + 6 + ButtonWidth(button, RemoveAsk);
+
+        private const string EditLabel = "Edit";
+        private const string SnoozeAllLabel = "Snooze all";
 
         /// <summary>The one button on a banner line: Snooze while alarming, Unsnooze while snoozed.</summary>
         private static string RowAction(AlarmDefinition a) => a.state == AlarmState.Snoozed ? "Unsnooze" : SnoozeLabel(a);
