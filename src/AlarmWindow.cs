@@ -33,6 +33,7 @@ namespace DashboardAlarms
         private static Rect bannerRect;
         private static GUIStyle bannerStyle;
         private static GUIStyle wrapLabel;
+        private static GUIStyle bannerLineStyle;
 
         public static bool EditorOpen => editing != null;
 
@@ -186,6 +187,8 @@ namespace DashboardAlarms
             };
             bannerStyle.normal.textColor = Color.white;
             wrapLabel = new GUIStyle(GUI.skin.label) { wordWrap = true };
+            bannerLineStyle = new GUIStyle(GUI.skin.label) { wordWrap = true, fontSize = 14 };
+            bannerLineStyle.normal.textColor = Color.white;
         }
 
         // ---------------------------------------------------------------- banner
@@ -198,10 +201,33 @@ namespace DashboardAlarms
                 bannerRect = Rect.zero;
                 return;
             }
-            float w = 560;
-            float lineH = 26;
+            // Size everything from the real text so nothing is cut off at any UI scale or font.
+            const float pad = 8;
+            const float gap = 6;
+            float w = Mathf.Min(760, Screen.width / Scale - 40);
+            float inner = w - 2 * pad;
+            GUIStyle button = GUI.skin.button;
+            GUIStyle label = bannerLineStyle;
+            float ackW = ButtonWidth(button, "Ack");
+
             int shown = Math.Min(raised, 5);
-            float h = 34 + shown * lineH + 6;
+            var lines = new List<KeyValuePair<AlarmDefinition, string>>();
+            float rowsH = 0;
+            foreach (AlarmDefinition a in AlarmManager.Alarms)
+            {
+                if (!a.IsRaised || lines.Count >= shown)
+                {
+                    continue;
+                }
+                string mark = a.state == AlarmState.Acknowledged ? "(acknowledged) " : "";
+                string text = $"{mark}{AlarmManager.Describe(a)}  -  now {AlarmManager.FormatValue(a, a.lastValue)}";
+                lines.Add(new KeyValuePair<AlarmDefinition, string>(a, text));
+                float labelW = inner - ackW - ButtonWidth(button, SnoozeLabel(a)) - 2 * gap;
+                rowsH += Mathf.Max(button.CalcHeight(new GUIContent("Ack"), ackW), label.CalcHeight(new GUIContent(text), labelW)) + gap;
+            }
+            float headerH = button.CalcHeight(new GUIContent("List"), 60) + gap;
+            float moreH = raised > shown ? label.CalcHeight(new GUIContent("x"), inner) : 0;
+            float h = pad + headerH + rowsH + moreH + pad;
             bannerRect = new Rect((Screen.width / Scale - w) / 2, 70, w, h);
 
             bool anyAlarming = false;
@@ -220,51 +246,56 @@ namespace DashboardAlarms
             GUI.Box(bannerRect, "", bannerStyle);
             GUI.backgroundColor = oldBg;
 
-            GUILayout.BeginArea(new Rect(bannerRect.x + 8, bannerRect.y + 4, bannerRect.width - 16, bannerRect.height - 8));
+            GUILayout.BeginArea(new Rect(bannerRect.x + pad, bannerRect.y + pad, inner, h - 2 * pad));
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"!! {raised} dashboard alarm{(raised == 1 ? "" : "s")}", GUILayout.ExpandWidth(true));
-            if (GUILayout.Button("Ack all", GUILayout.Width(70)))
+            GUILayout.Label($"{raised} dashboard alarm{(raised == 1 ? "" : "s")}", label, GUILayout.ExpandWidth(true));
+            if (GUILayout.Button("Ack all", GUILayout.Width(ButtonWidth(button, "Ack all"))))
             {
                 AlarmManager.AcknowledgeAll();
             }
-            if (GUILayout.Button("Snooze all", GUILayout.Width(80)))
+            if (GUILayout.Button("Snooze all", GUILayout.Width(ButtonWidth(button, "Snooze all"))))
             {
                 AlarmManager.SnoozeAllRaised();
             }
-            if (GUILayout.Button("List", GUILayout.Width(50)))
+            if (GUILayout.Button("List", GUILayout.Width(ButtonWidth(button, "List"))))
             {
                 ToggleList();
             }
             GUILayout.EndHorizontal();
+            GUILayout.Space(gap);
 
-            int drawn = 0;
-            foreach (AlarmDefinition a in AlarmManager.Alarms)
+            foreach (KeyValuePair<AlarmDefinition, string> line in lines)
             {
-                if (!a.IsRaised)
-                {
-                    continue;
-                }
-                if (drawn++ >= shown)
-                {
-                    break;
-                }
+                AlarmDefinition a = line.Key;
+                string snooze = SnoozeLabel(a);
+                float labelW = inner - ackW - ButtonWidth(button, snooze) - 2 * gap;
                 GUILayout.BeginHorizontal();
-                string mark = a.state == AlarmState.Acknowledged ? "(ack) " : "";
-                GUILayout.Label($"{mark}{AlarmManager.Describe(a)} - now {AlarmManager.FormatValue(a, a.lastValue)}", GUILayout.ExpandWidth(true));
+                GUILayout.Label(line.Value, label, GUILayout.Width(labelW));
+                GUILayout.Space(gap);
                 GUI.enabled = a.state == AlarmState.Alarming;
-                if (GUILayout.Button("Ack", GUILayout.Width(44)))
+                if (GUILayout.Button("Ack", GUILayout.Width(ackW)))
                 {
                     AlarmManager.Acknowledge(a);
                 }
                 GUI.enabled = true;
-                if (GUILayout.Button($"Snooze {a.snoozeMinutes:0.#}m", GUILayout.Width(90)))
+                GUILayout.Space(gap);
+                if (GUILayout.Button(snooze, GUILayout.Width(ButtonWidth(button, snooze))))
                 {
                     AlarmManager.Snooze(a, a.snoozeMinutes);
                 }
                 GUILayout.EndHorizontal();
+                GUILayout.Space(gap);
+            }
+            if (raised > shown)
+            {
+                GUILayout.Label($"...and {raised - shown} more (List shows all)", label);
             }
             GUILayout.EndArea();
         }
+
+        private static string SnoozeLabel(AlarmDefinition a) => $"Snooze {a.snoozeMinutes:0.#} min";
+
+        private static float ButtonWidth(GUIStyle style, string text) => style.CalcSize(new GUIContent(text)).x + 12;
 
         // ---------------------------------------------------------------- editor
 
@@ -340,7 +371,7 @@ namespace DashboardAlarms
                 Row("Average over (minutes)", ref averageText, v => a.averageMinutes = (float)Math.Max(0.5, v));
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("The average freezes while a drop is in progress.", wrapLabel);
-                if (GUILayout.Button("Reset average", GUILayout.Width(110)))
+                if (GUILayout.Button("Reset average", GUILayout.Width(ButtonWidth(GUI.skin.button, "Reset average"))))
                 {
                     // accept the current level as the new normal
                     a.history.Clear();
@@ -561,11 +592,11 @@ namespace DashboardAlarms
                     a.ResetRuntimeTimersOnly();
                 }
                 GUILayout.Label($"[{a.state}] {AlarmManager.Describe(a)} - now {AlarmManager.FormatValue(a, a.lastValue)}", wrapLabel, GUILayout.ExpandWidth(true));
-                if (a.IsRaised && GUILayout.Button("Snooze", GUILayout.Width(60)))
+                if (a.IsRaised && GUILayout.Button("Snooze", GUILayout.Width(ButtonWidth(GUI.skin.button, "Snooze"))))
                 {
                     AlarmManager.Snooze(a, a.snoozeMinutes);
                 }
-                if (GUILayout.Button("Edit", GUILayout.Width(44)))
+                if (GUILayout.Button("Edit", GUILayout.Width(ButtonWidth(GUI.skin.button, "Edit"))))
                 {
                     StatPlan plan = AlarmManager.ResolvePlan(GameMain.data, a);
                     if (plan != null)
@@ -573,7 +604,7 @@ namespace DashboardAlarms
                         OpenEditor(plan);
                     }
                 }
-                if (GUILayout.Button("X", GUILayout.Width(24)))
+                if (GUILayout.Button("Delete", GUILayout.Width(ButtonWidth(GUI.skin.button, "Delete"))))
                 {
                     remove = a;
                 }

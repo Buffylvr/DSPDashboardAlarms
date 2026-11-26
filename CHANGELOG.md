@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+- Banner sized from its text: long alarm lines wrap onto extra lines and the banner grows to fit; buttons are
+  as wide as their labels. Same for the list window's buttons ("X" is now "Delete").
+- Confirmed in game: an alarm fires and shows the banner.
+
 ## 0.2.2
 - Alarm sounds no longer use the game's Sound Effects slider, so they are heard with effects turned off. They play
   through the mod's own 2D audio source at `Sound.AlarmVolume` (new, default 1) x the game's Game Master Volume.

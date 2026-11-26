@@ -1,6 +1,6 @@
 {
   "name": "DashboardAlarms",
-  "version_number": "0.2.2",
+  "version_number": "0.2.3",
   "website_url": "https://github.com/Buffylvr/DSPDashboardAlarms",
   "description": "Alarms on Dashboard production/storage charts: threshold or % drop, hold time, flashing border, banner, sound, ack and snooze.",
   "dependencies": [
