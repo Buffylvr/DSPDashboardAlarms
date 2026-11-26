@@ -70,6 +70,7 @@ alarm is deleted too.
 |---|---|---|
 | `General.SampleSeconds` | 2 | How often each alarm checks its chart's value |
 | `General.StockRefreshSeconds` | 30 | How often stock and max-production alarms ask the game to recount storage and machines. The game counts one planet per tick, so on very large saves a lower number costs more CPU. Minimum 5. |
+| `Sound.AlarmVolume` | 1 | Alarm sound volume (0 to 1), multiplied by the game's Game Master Volume. The game's Sound Effects slider doesn't affect alarms, so they are heard with effects off. |
 | `UI.Scale` | 1 | Size of the alarm windows and banner |
 | `UI.AlarmListHotkey` | Ctrl+Shift+A | Opens and closes the alarm list |
 

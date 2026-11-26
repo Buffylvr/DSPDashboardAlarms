@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+- Alarm sounds no longer use the game's Sound Effects slider, so they are heard with effects turned off. They play
+  through the mod's own 2D audio source at `Sound.AlarmVolume` (new, default 1) x the game's Game Master Volume.
+
 ## 0.2.1
 - Sounds play as plain 2D sounds at the listener, so the player's position can't make them inaudible.
 - The Test button writes a sound report to the BepInEx log (sound found, volumes, listener, whether it is playing).

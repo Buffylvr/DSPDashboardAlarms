@@ -330,6 +330,11 @@ namespace DashboardAlarms
             }
         }
 
+        /// <summary>Alarm volume 0..1 (config). Multiplied by the game's master volume only.</summary>
+        public static float AlarmVolume = 1f;
+
+        private static AudioSource alarmSource;
+
         public static void PlaySounds(List<string> names, bool diagnose = false)
         {
             if (names == null)
@@ -339,9 +344,8 @@ namespace DashboardAlarms
             if (diagnose)
             {
                 Plugin.Log?.LogInfo($"Sound test: {names.Count} sound(s) [{string.Join(", ", names.ToArray())}]; "
-                    + $"game volume master {VFAudio.audioVolume:0.##} x effects {VFAudio.soundVolume:0.##}; "
-                    + $"listener volume {AudioListener.volume:0.##}, listener {(VFListener.audioListener == null ? "missing" : VFListener.audioListener.enabled ? "on" : "off")}; "
-                    + $"background mute {VFAudio.backgroundMute}, focused {Application.isFocused}");
+                    + $"alarm volume {AlarmVolume:0.##} x game master {VFAudio.audioVolume:0.##} (game effects slider {VFAudio.soundVolume:0.##} is not used); "
+                    + $"listener volume {AudioListener.volume:0.##}, background mute {VFAudio.backgroundMute}, focused {Application.isFocused}");
             }
             foreach (string n in names)
             {
@@ -349,6 +353,11 @@ namespace DashboardAlarms
             }
         }
 
+        /// <summary>
+        /// Plays one of the game's sounds through the mod's own 2D AudioSource. The game's own VFAudio
+        /// scales by the Sound Effects slider, so players who turn effects off would never hear an
+        /// alarm; this uses AlarmVolume x the game's master volume instead.
+        /// </summary>
         public static void PlaySound(string name, bool diagnose = false)
         {
             if (string.IsNullOrEmpty(name))
@@ -363,28 +372,46 @@ namespace DashboardAlarms
                     Plugin.Log?.LogWarning($"Sound '{name}' is not one of the game's sounds");
                     return;
                 }
-                // Play as a plain 2D sound at the listener, so where the player is never matters.
-                Vector3 at = VFListener.listenerTransform != null ? VFListener.listenerTransform.position : Vector3.zero;
-                VFAudio audio = VFAudio.Create(name, null, at, play: false, 0, -1, -1L);
-                if (audio == null)
+                if (proto.audioClip == null)
                 {
-                    Plugin.Log?.LogWarning($"Sound '{name}': the game did not create it");
+                    proto.Preload();
+                }
+                AudioClip clip = proto.audioClip;
+                if (clip == null)
+                {
+                    Plugin.Log?.LogWarning($"Sound '{name}': the game has no clip for it");
                     return;
                 }
-                audio.spatialBlendOverride = 0f;
-                audio.Play();
+                AudioSource src = EnsureSource();
+                float volume = Mathf.Clamp01(AlarmVolume) * Mathf.Clamp01(VFAudio.audioVolume) * (proto.Volume > 0 ? proto.Volume : 1f);
+                src.PlayOneShot(clip, volume);
                 if (diagnose)
                 {
-                    AudioSource src = audio.audioSource;
-                    Plugin.Log?.LogInfo($"Sound '{name}': clip {(src != null && src.clip != null ? src.clip.name : "none")}, "
-                        + $"volume {(src != null ? src.volume : -1):0.###} (proto {proto.Volume:0.##}), playing {(src != null && src.isPlaying)}, "
-                        + $"active {audio.gameObject.activeInHierarchy}");
+                    Plugin.Log?.LogInfo($"Sound '{name}': clip {clip.name} ({clip.length:0.##}s), volume {volume:0.###}, playing {src.isPlaying}");
                 }
             }
             catch (Exception e)
             {
                 Plugin.Log?.LogWarning($"Could not play sound '{name}': {e.GetType().Name}: {e.Message}");
             }
+        }
+
+        private static AudioSource EnsureSource()
+        {
+            if (alarmSource != null)
+            {
+                return alarmSource;
+            }
+            var go = new GameObject("DashboardAlarms.Audio");
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            alarmSource = go.AddComponent<AudioSource>();
+            alarmSource.playOnAwake = false;
+            alarmSource.spatialBlend = 0f;   // plain 2D: same loudness wherever the player is
+            alarmSource.bypassEffects = true;
+            alarmSource.bypassListenerEffects = true; // ignore the game's low/high-pass filters
+            alarmSource.bypassReverbZones = true;
+            alarmSource.priority = 0;        // never dropped when many sounds play
+            return alarmSource;
         }
 
         // ---------------------------------------------------------------- stock refresh

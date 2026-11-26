@@ -16,13 +16,14 @@ namespace DashboardAlarms
     {
         public const string Guid = "buffylvr.dsp.dashboardalarms";
         public const string Name = "Dashboard Alarms";
-        public const string Version = "0.2.1";
+        public const string Version = "0.2.2";
 
         internal static ManualLogSource Log;
         internal static float UiScale = 1f;
 
         private ConfigEntry<float> sampleSeconds;
         private ConfigEntry<float> stockRefreshSeconds;
+        private ConfigEntry<float> alarmVolume;
         private ConfigEntry<float> uiScale;
         private ConfigEntry<KeyboardShortcut> listHotkey;
         private Harmony harmony;
@@ -34,6 +35,8 @@ namespace DashboardAlarms
                 "How often (seconds) every alarm checks its chart's value.");
             stockRefreshSeconds = Config.Bind("General", "StockRefreshSeconds", 30f,
                 "How often (seconds) stock and max-production alarms ask the game to recount storage and machines. The game counts one planet per tick, so lower values cost more CPU on big saves. Minimum 5.");
+            alarmVolume = Config.Bind("Sound", "AlarmVolume", 1f,
+                "Alarm sound volume, 0 to 1. Multiplied by the game's Game Master Volume only, so alarms are heard even with the game's Sound Effects slider off.");
             uiScale = Config.Bind("UI", "Scale", 1f, "Scale of the alarm windows and banner.");
             listHotkey = Config.Bind("UI", "AlarmListHotkey", new KeyboardShortcut(KeyCode.A, KeyCode.LeftControl, KeyCode.LeftShift),
                 "Opens/closes the list of all dashboard alarms.");
@@ -49,6 +52,7 @@ namespace DashboardAlarms
         {
             AlarmManager.SampleSeconds = Mathf.Max(0.5f, sampleSeconds.Value);
             AlarmManager.StockRefreshSeconds = Mathf.Max(5f, stockRefreshSeconds.Value);
+            AlarmManager.AlarmVolume = Mathf.Clamp01(alarmVolume.Value);
             UiScale = Mathf.Clamp(uiScale.Value, 0.5f, 3f);
         }
 
