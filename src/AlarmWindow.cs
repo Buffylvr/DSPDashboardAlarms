@@ -399,7 +399,7 @@ namespace DashboardAlarms
                 GUI.enabled = a.sounds.Count > 0;
                 if (GUILayout.Button("Test", GUILayout.Width(60)))
                 {
-                    AlarmManager.PlaySounds(a.sounds);
+                    AlarmManager.PlaySounds(a.sounds, diagnose: true);
                 }
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();

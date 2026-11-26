@@ -330,27 +330,60 @@ namespace DashboardAlarms
             }
         }
 
-        public static void PlaySounds(List<string> names)
+        public static void PlaySounds(List<string> names, bool diagnose = false)
         {
             if (names == null)
             {
                 return;
             }
+            if (diagnose)
+            {
+                Plugin.Log?.LogInfo($"Sound test: {names.Count} sound(s) [{string.Join(", ", names.ToArray())}]; "
+                    + $"game volume master {VFAudio.audioVolume:0.##} x effects {VFAudio.soundVolume:0.##}; "
+                    + $"listener volume {AudioListener.volume:0.##}, listener {(VFListener.audioListener == null ? "missing" : VFListener.audioListener.enabled ? "on" : "off")}; "
+                    + $"background mute {VFAudio.backgroundMute}, focused {Application.isFocused}");
+            }
             foreach (string n in names)
             {
-                PlaySound(n);
+                PlaySound(n, diagnose);
             }
         }
 
-        public static void PlaySound(string name)
+        public static void PlaySound(string name, bool diagnose = false)
         {
+            if (string.IsNullOrEmpty(name))
+            {
+                name = Sounds.Default;
+            }
             try
             {
-                VFAudio.Create(string.IsNullOrEmpty(name) ? Sounds.Default : name, null, Vector3.zero, play: true, 0, -1, -1L);
+                AudioProto proto = LDB.audios[name];
+                if (proto == null)
+                {
+                    Plugin.Log?.LogWarning($"Sound '{name}' is not one of the game's sounds");
+                    return;
+                }
+                // Play as a plain 2D sound at the listener, so where the player is never matters.
+                Vector3 at = VFListener.listenerTransform != null ? VFListener.listenerTransform.position : Vector3.zero;
+                VFAudio audio = VFAudio.Create(name, null, at, play: false, 0, -1, -1L);
+                if (audio == null)
+                {
+                    Plugin.Log?.LogWarning($"Sound '{name}': the game did not create it");
+                    return;
+                }
+                audio.spatialBlendOverride = 0f;
+                audio.Play();
+                if (diagnose)
+                {
+                    AudioSource src = audio.audioSource;
+                    Plugin.Log?.LogInfo($"Sound '{name}': clip {(src != null && src.clip != null ? src.clip.name : "none")}, "
+                        + $"volume {(src != null ? src.volume : -1):0.###} (proto {proto.Volume:0.##}), playing {(src != null && src.isPlaying)}, "
+                        + $"active {audio.gameObject.activeInHierarchy}");
+                }
             }
             catch (Exception e)
             {
-                Plugin.Log?.LogWarning($"Could not play sound '{name}': {e.Message}");
+                Plugin.Log?.LogWarning($"Could not play sound '{name}': {e.GetType().Name}: {e.Message}");
             }
         }
 

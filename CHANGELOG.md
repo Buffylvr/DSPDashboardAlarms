@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+- Sounds play as plain 2D sounds at the listener, so the player's position can't make them inaudible.
+- The Test button writes a sound report to the BepInEx log (sound found, volumes, listener, whether it is playing).
+- A sound the game refuses is now logged instead of failing silently.
+
 ## 0.2.0
 - New "Watch" choices on production charts: **Max production/min** (the game's reference rate: what every
   powered machine making the item can output, counting proliferator) and **Use % of max** (consumption as
