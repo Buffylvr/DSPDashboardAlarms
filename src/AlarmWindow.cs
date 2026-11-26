@@ -35,6 +35,7 @@ namespace DashboardAlarms
         private static GUIStyle wrapLabel;
         private static GUIStyle bannerLineStyle;
         private static GUIStyle bannerSnoozedStyle;
+        private static GUIStyle bannerTitleStyle;
 
         public static bool EditorOpen => editing != null;
 
@@ -149,11 +150,25 @@ namespace DashboardAlarms
             {
                 return;
             }
+            GUISkin oldSkin = GUI.skin;
+            GUI.skin = GameSkin.Skin; // the game-themed look for everything drawn below
             EnsureStyles();
             Matrix4x4 old = GUI.matrix;
             float s = Scale;
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(s, s, 1));
+            try
+            {
+                DrawAll();
+            }
+            finally
+            {
+                GUI.matrix = old;
+                GUI.skin = oldSkin;
+            }
+        }
 
+        private static void DrawAll()
+        {
             DrawBanner();
             if (editing != null)
             {
@@ -170,7 +185,6 @@ namespace DashboardAlarms
             {
                 listRect = GUILayout.Window(ListWindowId, listRect, DrawList, "Dashboard alarms");
             }
-            GUI.matrix = old;
         }
 
         private static void EnsureStyles()
@@ -190,6 +204,7 @@ namespace DashboardAlarms
             wrapLabel = new GUIStyle(GUI.skin.label) { wordWrap = true };
             bannerLineStyle = new GUIStyle(GUI.skin.label) { wordWrap = true, fontSize = 14 };
             bannerLineStyle.normal.textColor = Color.white;
+            bannerTitleStyle = new GUIStyle(bannerLineStyle) { fontSize = 15, fontStyle = FontStyle.Bold };
             bannerSnoozedStyle = new GUIStyle(bannerLineStyle) { fontStyle = FontStyle.Italic };
             bannerSnoozedStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
         }
@@ -254,13 +269,20 @@ namespace DashboardAlarms
             bannerRect = new Rect((Screen.width / Scale - w) / 2, 70, w, h);
 
             // flashing red while anything is alarming; steady and dimmer when everything is snoozed
+            // a dark game-style panel, washed red, with a bright red accent strip on the left that pulses
+            float pulse = alarming > 0 ? Mathf.Abs(Mathf.Sin(Time.realtimeSinceStartup * 4f)) : 0f;
             Color oldBg = GUI.backgroundColor;
+            Color oldColor = GUI.color;
             GUI.backgroundColor = alarming > 0
-                ? new Color(0.9f, 0.1f, 0.1f, 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.realtimeSinceStartup * 4f)))
-                : new Color(0.55f, 0.15f, 0.15f, 0.6f);
-            GUI.Box(bannerRect, "", bannerStyle);
+                ? Color.Lerp(new Color(0.24f, 0.05f, 0.07f, 0.95f), new Color(0.48f, 0.07f, 0.08f, 0.97f), pulse)
+                : new Color(0.16f, 0.09f, 0.11f, 0.93f);
             GUI.Box(bannerRect, "", bannerStyle);
             GUI.backgroundColor = oldBg;
+            GUI.color = alarming > 0
+                ? Color.Lerp(new Color(1f, 0.25f, 0.2f, 0.8f), new Color(1f, 0.45f, 0.35f, 1f), pulse)
+                : new Color(0.75f, 0.35f, 0.35f, 0.7f);
+            GUI.DrawTexture(new Rect(bannerRect.x, bannerRect.y, 4, bannerRect.height), Texture2D.whiteTexture);
+            GUI.color = oldColor;
 
             GUILayout.BeginArea(new Rect(bannerRect.x + pad, bannerRect.y + pad, inner, h - 2 * pad));
             GUILayout.BeginHorizontal();
@@ -269,7 +291,7 @@ namespace DashboardAlarms
             {
                 title += $" ({snoozed} snoozed)";
             }
-            GUILayout.Label(title, bannerLineStyle, GUILayout.ExpandWidth(true));
+            GUILayout.Label(title, bannerTitleStyle, GUILayout.ExpandWidth(true));
             // only useful with two or more alarms going off; with one it would just repeat that line's Snooze
             if (alarming >= 2 && GUILayout.Button(SnoozeAllLabel, GUILayout.Width(ButtonWidth(button, SnoozeAllLabel))))
             {
@@ -408,11 +430,11 @@ namespace DashboardAlarms
             GUILayout.Label($"Chart: {plan.displayName}  -  {StatReader.ItemName(a.itemId)}, {StatReader.AreaName(GameMain.data, a.astroFilter)}", wrapLabel);
             GUILayout.Space(4);
 
-            a.enabled = GUILayout.Toggle(a.enabled, " Alarm enabled");
+            a.enabled = GameSkin.Toggle(a.enabled, "Alarm enabled");
             GUILayout.Space(4);
 
             // metric
-            GUILayout.Label("Watch");
+            GUILayout.Label("Watch", GameSkin.Header);
             if (plan is AstroItemProductionStatPlan pp)
             {
                 int current = Array.IndexOf(RateMetrics, a.metric);
@@ -431,13 +453,13 @@ namespace DashboardAlarms
                 switch (a.metric)
                 {
                     case AlarmMetric.MaxProduction:
-                        GUILayout.Label("The most this area's powered machines can make per minute, counting proliferator: the game's reference rate.", wrapLabel);
+                        GUILayout.Label("The most this area's powered machines can make per minute, counting proliferator: the game's reference rate.", GameSkin.DimLabel);
                         break;
                     case AlarmMetric.UsePercent:
-                        GUILayout.Label($"Consumption ({window} average{note}) as a % of max production. 90 means you are using 90% of what your machines can make.", wrapLabel);
+                        GUILayout.Label($"Consumption ({window} average{note}) as a % of max production. 90 means you are using 90% of what your machines can make.", GameSkin.DimLabel);
                         break;
                     default:
-                        GUILayout.Label($"Uses the chart's {window} average{note}, the same number the chart shows.", wrapLabel);
+                        GUILayout.Label($"Uses the chart's {window} average{note}, the same number the chart shows.", GameSkin.DimLabel);
                         break;
                 }
             }
@@ -449,7 +471,7 @@ namespace DashboardAlarms
             GUILayout.Space(4);
 
             // trigger
-            GUILayout.Label("Trigger");
+            GUILayout.Label("Trigger", GameSkin.Header);
             var trigger = (AlarmTrigger)Choice((int)a.trigger, new[] { "Below", "Above", "% drop from average" }, 3);
             if (trigger != a.trigger)
             {
@@ -461,7 +483,7 @@ namespace DashboardAlarms
                 Row("Drop %", ref dropText, v => a.dropPercent = Math.Max(0.1, Math.Min(100, v)));
                 Row("Average over (minutes)", ref averageText, v => a.averageMinutes = (float)Math.Max(0.5, v));
                 GUILayout.BeginHorizontal();
-                GUILayout.Label("The average freezes while a drop is in progress.", wrapLabel);
+                GUILayout.Label("The average freezes while a drop is in progress.", GameSkin.DimLabel);
                 if (GUILayout.Button("Reset average", GUILayout.Width(ButtonWidth(GUI.skin.button, "Reset average"))))
                 {
                     // accept the current level as the new normal
@@ -481,10 +503,10 @@ namespace DashboardAlarms
             GUILayout.Space(4);
 
             // alarm
-            a.playSound = GUILayout.Toggle(a.playSound, " Play sound");
+            a.playSound = GameSkin.Toggle(a.playSound, "Play sound");
             if (a.playSound)
             {
-                GUILayout.Label("Sounds (pick one or more; they play together)", wrapLabel);
+                GUILayout.Label("Sounds (pick one or more; they play together)", GameSkin.DimLabel);
                 int n = Sounds.Options.GetLength(0);
                 for (int i = 0; i < n; i++)
                 {
@@ -515,7 +537,7 @@ namespace DashboardAlarms
                 GUILayout.BeginHorizontal();
                 if (a.sounds.Count == 0)
                 {
-                    GUILayout.Label("No sound picked: the alarm will be silent.", wrapLabel);
+                    GUILayout.Label("No sound picked: the alarm will be silent.", GameSkin.DimLabel);
                 }
                 GUILayout.FlexibleSpace();
                 GUI.enabled = a.sounds.Count > 0;
@@ -534,7 +556,7 @@ namespace DashboardAlarms
             string max = a.metric == AlarmMetric.UsePercent && a.hasMax ? $"   (max production {AlarmManager.Format(a.lastMax)}/min)" : "";
             if (Metrics.NeedsRecount(a.metric) && !a.hasValue)
             {
-                GUILayout.Label("Now: waiting for the game to count machines and storage (a few seconds)...", wrapLabel);
+                GUILayout.Label("Now: waiting for the game to count machines and storage (a few seconds)...", GameSkin.DimLabel);
             }
             else
             {
@@ -612,17 +634,8 @@ namespace DashboardAlarms
         /// <summary>A button drawn tinted with a marker when on. Returns true when clicked.</summary>
         private static bool ChoiceButton(bool on, string label)
         {
-            Color bg = GUI.backgroundColor;
-            Color fg = GUI.contentColor;
-            if (on)
-            {
-                GUI.backgroundColor = new Color(0.2f, 0.75f, 1f);
-                GUI.contentColor = new Color(1f, 0.92f, 0.45f);
-            }
-            bool clicked = GUILayout.Button(on ? "● " + label : label, GUILayout.MinWidth(120));
-            GUI.backgroundColor = bg;
-            GUI.contentColor = fg;
-            return clicked;
+            // selected: filled cyan with a bright edge (the game's "active tab" look)
+            return GUILayout.Button(label, on ? GameSkin.SelectedButton : GUI.skin.button, GUILayout.MinWidth(120));
         }
 
         private static void Row(string label, ref string text, Action<double> apply)
@@ -670,13 +683,13 @@ namespace DashboardAlarms
             listScroll = GUILayout.BeginScrollView(listScroll, GUILayout.Height(280));
             if (AlarmManager.Alarms.Count == 0)
             {
-                GUILayout.Label("No alarms yet. Open the Dashboard, click a production or storage chart's menu button, and choose \"Alarm...\".", wrapLabel);
+                GUILayout.Label("No alarms yet. Open the Dashboard, click a production or storage chart's menu button, and choose \"Add alarm...\".", GameSkin.DimLabel);
             }
             AlarmDefinition remove = null;
             foreach (AlarmDefinition a in AlarmManager.Alarms)
             {
                 GUILayout.BeginHorizontal();
-                bool en = GUILayout.Toggle(a.enabled, "", GUILayout.Width(20));
+                bool en = GameSkin.Toggle(a.enabled, "", GUILayout.Width(22));
                 if (en != a.enabled)
                 {
                     a.enabled = en;

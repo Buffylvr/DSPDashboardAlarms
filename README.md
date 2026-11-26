@@ -133,7 +133,7 @@ cd tests/LogicTests && dotnet build -c Release && bin/Release/net472/DashboardAl
 
 - Only item production and item storage charts can have alarms. Power, Dyson sphere and other
   chart types can't yet.
-- The windows use the plain Unity IMGUI style, not the game's own UI style.
+- The windows are drawn with Unity IMGUI, styled to look like the game's UI (they are not built from the game's own UI parts).
 - While you type in a number field, some game hotkeys that don't check the game's "typing" flag
   might still react.
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+- The alarm editor, alarm list and banner are restyled to match the game's UI: the game's own font, dark
+  translucent navy panels with a title band and cyan rule, cyan-edged flat buttons with hover/pressed states,
+  filled cyan for the selected choice, game-style checkboxes, dark input fields with a cyan focus edge, thin
+  scrollbars, accent-coloured section headers and dimmed help text. The banner is a dark red-washed panel with a
+  pulsing red accent strip.
+
 ## 0.6.3
 - Fix: the last banner button ("Remove...") was pushed past the right edge and clipped; the line width now counts
   the margins around each button.
