@@ -19,6 +19,8 @@ internal static class Program
         SnoozeSuppressesThenReturns();
         DisabledAlarmStaysQuiet();
         SaveRoundTrip();
+        LoadsVersion1Save();
+        NewMetrics();
         NumberParsing();
         HarmonyTargetsResolve();
         Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
@@ -162,8 +164,11 @@ internal static class Program
         {
             statPlanId = 42, planType = 1, itemId = 6006, astroFilter = -1, enabled = true,
             metric = AlarmMetric.Net, trigger = AlarmTrigger.DropPercent, threshold = 12345.5, dropPercent = 17.5,
-            averageMinutes = 7, holdSeconds = 45, playSound = true, sound = "df-alarm", repeatSoundSeconds = 0, snoozeMinutes = 15,
+            averageMinutes = 7, holdSeconds = 45, playSound = true, repeatSoundSeconds = 0, snoozeMinutes = 15,
         };
+        a.sounds.Clear();
+        a.sounds.Add("df-alarm");
+        a.sounds.Add("ui-error");
         var ms = new MemoryStream();
         using (var w = new BinaryWriter(ms, System.Text.Encoding.UTF8, true))
         {
@@ -178,8 +183,59 @@ internal static class Program
         bool same = b.statPlanId == 42 && b.planType == 1 && b.itemId == 6006 && b.astroFilter == -1 && b.enabled
             && b.metric == AlarmMetric.Net && b.trigger == AlarmTrigger.DropPercent && b.threshold == 12345.5
             && b.dropPercent == 17.5 && b.averageMinutes == 7 && b.holdSeconds == 45 && b.playSound
-            && b.sound == "df-alarm" && b.repeatSoundSeconds == 0 && b.snoozeMinutes == 15;
+            && b.sounds.Count == 2 && b.sounds[0] == "df-alarm" && b.sounds[1] == "ui-error" && b.repeatSoundSeconds == 0 && b.snoozeMinutes == 15;
         Check("save: definition round-trips", same);
+    }
+
+    /// <summary>A save written by v0.1.0 (format 1, one sound string) must still load.</summary>
+    private static void LoadsVersion1Save()
+    {
+        var ms = new MemoryStream();
+        using (var w = new BinaryWriter(ms, System.Text.Encoding.UTF8, true))
+        {
+            w.Write(1);            // version
+            w.Write(7); w.Write(1); w.Write(1210); w.Write(-1); // plan id, type, item, area
+            w.Write(true);         // enabled
+            w.Write((int)AlarmMetric.Consumption);
+            w.Write((int)AlarmTrigger.Above);
+            w.Write(5000.0);       // threshold
+            w.Write(20.0);         // drop %
+            w.Write(10f);          // average minutes
+            w.Write(30f);          // hold
+            w.Write(true);         // play sound
+            w.Write("ui-error");   // the single v1 sound
+            w.Write(15f);          // repeat
+            w.Write(5f);           // snooze
+        }
+        ms.Position = 0;
+        AlarmDefinition b;
+        using (var r = new BinaryReader(ms))
+        {
+            b = AlarmDefinition.Read(r);
+            Check("save v1: reads to the end", r.BaseStream.Position == r.BaseStream.Length);
+        }
+        Check("save v1: fields and single sound load", b.statPlanId == 7 && b.itemId == 1210 && b.metric == AlarmMetric.Consumption
+            && b.threshold == 5000 && b.sounds.Count == 1 && b.sounds[0] == "ui-error" && b.repeatSoundSeconds == 15 && b.snoozeMinutes == 5);
+    }
+
+    private static void NewMetrics()
+    {
+        double use = AlarmManager.ComputeSample(AlarmMetric.UsePercent, 22153, 22656, 32000);
+        Check("metric: use % = consumption / max", Math.Abs(use - 70.8) < 0.01, use.ToString("0.###"));
+        Check("metric: use % waits for max", double.IsNaN(AlarmManager.ComputeSample(AlarmMetric.UsePercent, 1, 1, double.NaN)));
+        Check("metric: use % with no machines gives no reading", double.IsNaN(AlarmManager.ComputeSample(AlarmMetric.UsePercent, 0, 5, 0)));
+        Check("metric: max production", AlarmManager.ComputeSample(AlarmMetric.MaxProduction, 1, 2, 32000) == 32000);
+        Check("metric: net", AlarmManager.ComputeSample(AlarmMetric.Net, 100, 30, double.NaN) == 70);
+
+        // "warn when I'm using 90% of what I can make": above 90 with a hold
+        AlarmDefinition a = New(AlarmTrigger.Above, 90, 30);
+        a.metric = AlarmMetric.UsePercent;
+        long t = 0;
+        AlarmManager.Evaluate(a, t, AlarmManager.ComputeSample(a.metric, 0, 28000, 32000)); // 87.5%
+        Check("use %: 87.5% is fine", a.state == AlarmState.Normal);
+        t += 2 * S; AlarmManager.Evaluate(a, t, AlarmManager.ComputeSample(a.metric, 0, 29500, 32000)); // 92.2%
+        t += 30 * S; AlarmManager.Evaluate(a, t, AlarmManager.ComputeSample(a.metric, 0, 29500, 32000));
+        Check("use %: 92% held 30s alarms", a.state == AlarmState.Alarming, a.state.ToString());
     }
 
     /// <summary>Every [HarmonyPatch] must name a real game method with matching parameter names.</summary>

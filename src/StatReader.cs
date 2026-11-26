@@ -6,8 +6,8 @@ namespace DashboardAlarms
     /// Reads the live numbers behind a dashboard stat plan.
     ///
     /// Rates come from the game's rolling production statistics: for every factory,
-    /// ProductStat.total[1] is items produced over the last minute and total[8] items consumed
-    /// over the last minute (the same numbers the 1-minute statistics view shows).
+    /// ProductStat.total[level + 1] is items produced over the chart's time window and
+    /// total[level + 8] items consumed, divided down to per minute exactly as the chart does.
     ///
     /// Storage counts are not kept up to date by the game; they are recomputed on demand by
     /// ProductionExtraInfoCalculator, one factory per tick, normally only while the dashboard
@@ -46,7 +46,19 @@ namespace DashboardAlarms
             }
         }
 
-        /// <summary>Production and consumption per minute over the plan's area (whole cluster when astroFilter is -1).</summary>
+        // Same divisors the chart uses (UIChartAstroItemProduction.ShowInText) to turn a level's total into a per-minute rate.
+        private static readonly double[] LevelMinutes = { 1, 10, 60, 600, 6000 };
+        private static readonly string[] LevelNames = { "1-minute", "10-minute", "1-hour", "10-hour", "100-hour" };
+
+        /// <summary>The chart's time setting (0..4); the "total" setting (5) falls back to 1 minute.</summary>
+        public static int RateLevel(AstroItemProductionStatPlan plan) => plan.timeLevel >= 0 && plan.timeLevel <= 4 ? plan.timeLevel : 0;
+
+        public static string RateWindowName(AstroItemProductionStatPlan plan) => LevelNames[RateLevel(plan)];
+
+        /// <summary>
+        /// Production and consumption per minute over the plan's area (whole cluster when astroFilter is -1),
+        /// averaged over the chart's own time window so the value matches what the chart shows.
+        /// </summary>
         public static bool TryReadRates(GameData data, AstroItemProductionStatPlan plan, out double production, out double consumption)
         {
             production = 0;
@@ -55,6 +67,9 @@ namespace DashboardAlarms
             {
                 return false;
             }
+            int level = RateLevel(plan);
+            int prodIndex = ProductionLastMinute + level;
+            int consIndex = ConsumptionLastMinute + level;
             FactoryProductionStat[] pool = data.statistics.production.factoryStatPool;
             CollectFactories(data, plan.astroFilter, factoryScratch);
             foreach (int fi in factoryScratch)
@@ -70,10 +85,23 @@ namespace DashboardAlarms
                     continue;
                 }
                 ProductStat ps = fs.productPool[idx];
-                production += ps.total[ProductionLastMinute];
-                consumption += ps.total[ConsumptionLastMinute];
+                production += ps.total[prodIndex];
+                consumption += ps.total[consIndex];
             }
+            production /= LevelMinutes[level];
+            consumption /= LevelMinutes[level];
             return true;
+        }
+
+        /// <summary>
+        /// The game's reference production rate per minute: what every powered machine making the item
+        /// could output (with the best unlocked proliferator where it is used). Only valid after the
+        /// game's extra-info recount has run for the plan's factories.
+        /// </summary>
+        public static double ReadMaxProduction(AstroItemProductionStatPlan plan)
+        {
+            plan.GetItemsCyclicRefSpeed(out float productRefSpeed, out float _);
+            return productRefSpeed;
         }
 
         /// <summary>Sum of every storage category the storage chart shows (boxes, logistics, belts, other, player).</summary>

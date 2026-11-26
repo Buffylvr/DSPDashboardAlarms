@@ -140,9 +140,17 @@ namespace DashboardAlarms
                         sample = stock;
                     }
                 }
-                else if (plan is AstroItemProductionStatPlan pp && StatReader.TryReadRates(data, pp, out double prod, out double cons))
+                else if (plan is AstroItemProductionStatPlan pp)
                 {
-                    sample = a.metric == AlarmMetric.Production ? prod : a.metric == AlarmMetric.Consumption ? cons : prod - cons;
+                    if (readStock && Metrics.NeedsMax(a.metric))
+                    {
+                        a.lastMax = StatReader.ReadMaxProduction(pp);
+                        a.hasMax = true;
+                    }
+                    if (StatReader.TryReadRates(data, pp, out double prod, out double cons))
+                    {
+                        sample = ComputeSample(a.metric, prod, cons, a.hasMax ? a.lastMax : double.NaN);
+                    }
                 }
 
                 if (!a.enabled || a.isDraft)
@@ -158,6 +166,22 @@ namespace DashboardAlarms
                     continue;
                 }
                 Evaluate(a, now, sample);
+            }
+        }
+
+        /// <summary>The number a rate alarm watches. max is NaN until the game has counted the machines.</summary>
+        internal static double ComputeSample(AlarmMetric metric, double production, double consumption, double max)
+        {
+            switch (metric)
+            {
+                case AlarmMetric.Production: return production;
+                case AlarmMetric.Consumption: return consumption;
+                case AlarmMetric.Net: return production - consumption;
+                case AlarmMetric.MaxProduction: return max;
+                case AlarmMetric.UsePercent:
+                    // nothing able to make it: no reading rather than a divide by zero
+                    return double.IsNaN(max) || max <= 0 ? double.NaN : consumption / max * 100.0;
+                default: return double.NaN;
             }
         }
 
@@ -239,7 +263,7 @@ namespace DashboardAlarms
                 long repeat = (long)(a.repeatSoundSeconds * TicksPerSecond);
                 if (a.lastSoundTick < 0 || (repeat > 0 && now - a.lastSoundTick >= repeat) || a.lastSoundTick > now)
                 {
-                    PlaySound(a.sound);
+                    PlaySounds(a.sounds);
                     a.lastSoundTick = now;
                 }
             }
@@ -306,6 +330,18 @@ namespace DashboardAlarms
             }
         }
 
+        public static void PlaySounds(List<string> names)
+        {
+            if (names == null)
+            {
+                return;
+            }
+            foreach (string n in names)
+            {
+                PlaySound(n);
+            }
+        }
+
         public static void PlaySound(string name)
         {
             try
@@ -333,18 +369,28 @@ namespace DashboardAlarms
 
         private static void OnCalculatorFinished(double _)
         {
-            // Any finished recount (ours or the dashboard's own) leaves fresh storage numbers.
+            // Only trust a recount that included our request. The dashboard's own recounts may cover
+            // just the planets of its current page, and right after a load every other planet still
+            // reads 0 until it has been counted once.
+            if (stockRequested)
+            {
+                stockFresh = true;
+            }
             stockRequested = false;
-            stockFresh = true;
+        }
+
+        /// <summary>Ask for a recount on the next frame (after the editor switches to a metric that needs one).</summary>
+        public static void RequestRecountSoon()
+        {
+            lastStockRequestTick = -1;
         }
 
         private static void RequestStockRefreshIfDue(GameData data, long now)
         {
-            ProductionExtraInfoCalculator calc = data.statistics.production.extraInfoCalculator;
-            if (calc.calculating)
-            {
-                return;
-            }
+            // No need to wait for an idle calculator: it runs on the main thread between frames, and
+            // planets added while it is counting join the running batch, which only finishes (and
+            // fires onEndCalculate) once they are counted. Waiting could starve us while the
+            // dashboard is open, because the dashboard queues a new batch the moment one ends.
             long interval = (long)(Math.Max(5f, StockRefreshSeconds) * TicksPerSecond);
             if (lastStockRequestTick >= 0 && now - lastStockRequestTick < interval && now >= lastStockRequestTick && !(stockRequested && now - lastStockRequestTick > interval * 4))
             {
@@ -353,13 +399,20 @@ namespace DashboardAlarms
             bool any = false;
             foreach (AlarmDefinition a in Alarms)
             {
-                if (!a.enabled || a.metric != AlarmMetric.Stock)
+                if (!a.enabled || !Metrics.NeedsRecount(a.metric))
                 {
                     continue;
                 }
-                if (ResolvePlan(data, a) is AstroStorageStatPlan sp && sp.itemId > 0)
+                // queues the plan's factories; the game counts one per tick
+                StatPlan plan = ResolvePlan(data, a);
+                if (plan is AstroStorageStatPlan sp && sp.itemId > 0)
                 {
-                    sp.CalculateExtraInfo(); // queues the factories; the game counts one per tick
+                    sp.CalculateExtraInfo();
+                    any = true;
+                }
+                else if (plan is AstroItemProductionStatPlan pp && pp.itemId > 0)
+                {
+                    pp.CalculateExtraInfo();
                     any = true;
                 }
             }
@@ -377,14 +430,18 @@ namespace DashboardAlarms
             GameData data = GameMain.data;
             string item = StatReader.ItemName(a.itemId);
             string area = data != null ? StatReader.AreaName(data, a.astroFilter) : "";
-            string metric = a.metric == AlarmMetric.Production ? "production"
-                : a.metric == AlarmMetric.Consumption ? "consumption"
-                : a.metric == AlarmMetric.Net ? "net" : "stock";
-            string unit = a.metric == AlarmMetric.Stock ? "" : "/min";
+            string metric = Metrics.Name(a.metric);
+            string unit = Metrics.Unit(a.metric);
             string cond = a.trigger == AlarmTrigger.Below ? $"< {Format(a.threshold)}{unit}"
                 : a.trigger == AlarmTrigger.Above ? $"> {Format(a.threshold)}{unit}"
                 : $"{a.dropPercent:0.#}% below {a.averageMinutes:0.#}-min average";
             return $"{item} {metric} ({area}) {cond}";
+        }
+
+        /// <summary>A value with its metric's unit, e.g. "22.1k/min", "92.5%", "1.2M".</summary>
+        public static string FormatValue(AlarmDefinition a, double v)
+        {
+            return double.IsNaN(v) ? "-" : Format(v) + Metrics.Unit(a.metric);
         }
 
         public static string Format(double v)

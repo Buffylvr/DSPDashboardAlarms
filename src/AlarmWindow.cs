@@ -250,7 +250,7 @@ namespace DashboardAlarms
                 }
                 GUILayout.BeginHorizontal();
                 string mark = a.state == AlarmState.Acknowledged ? "(ack) " : "";
-                GUILayout.Label($"{mark}{AlarmManager.Describe(a)} - now {AlarmManager.Format(a.lastValue)}", GUILayout.ExpandWidth(true));
+                GUILayout.Label($"{mark}{AlarmManager.Describe(a)} - now {AlarmManager.FormatValue(a, a.lastValue)}", GUILayout.ExpandWidth(true));
                 GUI.enabled = a.state == AlarmState.Alarming;
                 if (GUILayout.Button("Ack", GUILayout.Width(44)))
                 {
@@ -291,14 +291,32 @@ namespace DashboardAlarms
 
             // metric
             GUILayout.Label("Watch");
-            if (StatReader.SupportsRate(plan))
+            if (plan is AstroItemProductionStatPlan pp)
             {
-                int m = a.metric == AlarmMetric.Stock ? 0 : (int)a.metric;
-                m = GUILayout.Toolbar(m, new[] { "Production/min", "Consumption/min", "Net/min" });
-                if ((AlarmMetric)m != a.metric)
+                int current = Array.IndexOf(RateMetrics, a.metric);
+                int m = Choice(current < 0 ? 0 : current, RateMetricLabels, 3);
+                if (RateMetrics[m] != a.metric)
                 {
-                    a.metric = (AlarmMetric)m;
+                    a.metric = RateMetrics[m];
                     a.ResetRuntime(); // old samples were of a different number
+                    if (Metrics.NeedsMax(a.metric))
+                    {
+                        AlarmManager.RequestRecountSoon();
+                    }
+                }
+                string window = StatReader.RateWindowName(pp);
+                string note = pp.timeLevel == 5 ? " (the chart is set to totals, so the alarm uses 1 minute)" : "";
+                switch (a.metric)
+                {
+                    case AlarmMetric.MaxProduction:
+                        GUILayout.Label("The most this area's powered machines can make per minute, counting proliferator: the game's reference rate.", wrapLabel);
+                        break;
+                    case AlarmMetric.UsePercent:
+                        GUILayout.Label($"Consumption ({window} average{note}) as a % of max production. 90 means you are using 90% of what your machines can make.", wrapLabel);
+                        break;
+                    default:
+                        GUILayout.Label($"Uses the chart's {window} average{note}, the same number the chart shows.", wrapLabel);
+                        break;
                 }
             }
             else
@@ -310,7 +328,7 @@ namespace DashboardAlarms
 
             // trigger
             GUILayout.Label("Trigger");
-            var trigger = (AlarmTrigger)GUILayout.Toolbar((int)a.trigger, new[] { "Below", "Above", "% drop from average" });
+            var trigger = (AlarmTrigger)Choice((int)a.trigger, new[] { "Below", "Above", "% drop from average" }, 3);
             if (trigger != a.trigger)
             {
                 a.trigger = trigger;
@@ -333,7 +351,9 @@ namespace DashboardAlarms
             }
             else
             {
-                Row(a.metric == AlarmMetric.Stock ? "Threshold (items)" : "Threshold (per minute)", ref thresholdText, v => a.threshold = v);
+                string thresholdLabel = a.metric == AlarmMetric.Stock ? "Threshold (items)"
+                    : a.metric == AlarmMetric.UsePercent ? "Threshold (%)" : "Threshold (per minute)";
+                Row(thresholdLabel, ref thresholdText, v => a.threshold = v);
             }
             Row("Hold time (seconds)", ref holdText, v => a.holdSeconds = (float)Math.Max(0, v));
             GUILayout.Space(4);
@@ -342,32 +362,62 @@ namespace DashboardAlarms
             a.playSound = GUILayout.Toggle(a.playSound, " Play sound");
             if (a.playSound)
             {
-                int current = 0;
+                GUILayout.Label("Sounds (pick one or more; they play together)", wrapLabel);
                 int n = Sounds.Options.GetLength(0);
-                string[] labels = new string[n];
                 for (int i = 0; i < n; i++)
                 {
-                    labels[i] = Sounds.Options[i, 1];
-                    if (Sounds.Options[i, 0] == a.sound)
+                    if (i % 3 == 0)
                     {
-                        current = i;
+                        GUILayout.BeginHorizontal();
+                    }
+                    string sound = Sounds.Options[i, 0];
+                    bool on = a.sounds.Contains(sound);
+                    if (ChoiceButton(on, Sounds.Options[i, 1]))
+                    {
+                        if (on)
+                        {
+                            a.sounds.Remove(sound);
+                        }
+                        else
+                        {
+                            // keep the list in menu order so it reads the same everywhere
+                            a.sounds.Add(sound);
+                            a.sounds.Sort((x, y) => SoundIndex(x).CompareTo(SoundIndex(y)));
+                        }
+                    }
+                    if (i % 3 == 2 || i == n - 1)
+                    {
+                        GUILayout.EndHorizontal();
                     }
                 }
                 GUILayout.BeginHorizontal();
-                int pick = GUILayout.SelectionGrid(current, labels, 3);
-                a.sound = Sounds.Options[pick, 0];
-                if (GUILayout.Button("Test", GUILayout.Width(50)))
+                if (a.sounds.Count == 0)
                 {
-                    AlarmManager.PlaySound(a.sound);
+                    GUILayout.Label("No sound picked: the alarm will be silent.", wrapLabel);
                 }
+                GUILayout.FlexibleSpace();
+                GUI.enabled = a.sounds.Count > 0;
+                if (GUILayout.Button("Test", GUILayout.Width(60)))
+                {
+                    AlarmManager.PlaySounds(a.sounds);
+                }
+                GUI.enabled = true;
                 GUILayout.EndHorizontal();
                 Row("Repeat sound every (s, 0 = once)", ref repeatText, v => a.repeatSoundSeconds = (float)Math.Max(0, v));
             }
             Row("Snooze length (minutes)", ref snoozeText, v => a.snoozeMinutes = (float)Math.Max(0.1, v));
 
             GUILayout.Space(6);
-            string avg = a.trigger == AlarmTrigger.DropPercent ? $"   average {AlarmManager.Format(a.lastAverage)}" : "";
-            GUILayout.Label($"Now: {AlarmManager.Format(a.lastValue)}{(a.metric == AlarmMetric.Stock ? "" : "/min")}{avg}   state: {a.state}");
+            string avg = a.trigger == AlarmTrigger.DropPercent ? $"   average {AlarmManager.FormatValue(a, a.lastAverage)}" : "";
+            string max = a.metric == AlarmMetric.UsePercent && a.hasMax ? $"   (max production {AlarmManager.Format(a.lastMax)}/min)" : "";
+            if (Metrics.NeedsRecount(a.metric) && !a.hasValue)
+            {
+                GUILayout.Label("Now: waiting for the game to count machines and storage (a few seconds)...", wrapLabel);
+            }
+            else
+            {
+                GUILayout.Label($"Now: {AlarmManager.FormatValue(a, a.lastValue)}{max}{avg}   state: {a.state}", wrapLabel);
+            }
 
             GUILayout.Space(6);
             GUILayout.BeginHorizontal();
@@ -389,6 +439,68 @@ namespace DashboardAlarms
             GUILayout.EndHorizontal();
 
             GUI.DragWindow();
+        }
+
+        private static readonly AlarmMetric[] RateMetrics =
+        {
+            AlarmMetric.Production, AlarmMetric.Consumption, AlarmMetric.Net,
+            AlarmMetric.MaxProduction, AlarmMetric.UsePercent,
+        };
+
+        private static readonly string[] RateMetricLabels =
+        {
+            "Production/min", "Consumption/min", "Net/min",
+            "Max production/min", "Use % of max",
+        };
+
+        private static int SoundIndex(string sound)
+        {
+            for (int i = 0; i < Sounds.Options.GetLength(0); i++)
+            {
+                if (Sounds.Options[i, 0] == sound)
+                {
+                    return i;
+                }
+            }
+            return int.MaxValue;
+        }
+
+        /// <summary>A row-wrapped set of buttons where exactly one is selected (and clearly highlighted).</summary>
+        private static int Choice(int current, string[] labels, int perRow)
+        {
+            int result = current;
+            for (int i = 0; i < labels.Length; i++)
+            {
+                if (i % perRow == 0)
+                {
+                    GUILayout.BeginHorizontal();
+                }
+                if (ChoiceButton(i == current, labels[i]))
+                {
+                    result = i;
+                }
+                if (i % perRow == perRow - 1 || i == labels.Length - 1)
+                {
+                    GUILayout.EndHorizontal();
+                }
+            }
+            return result;
+        }
+
+        /// <summary>A button drawn tinted with a marker when on. Returns true when clicked.</summary>
+        private static bool ChoiceButton(bool on, string label)
+        {
+            Color bg = GUI.backgroundColor;
+            Color fg = GUI.contentColor;
+            if (on)
+            {
+                GUI.backgroundColor = new Color(0.2f, 0.75f, 1f);
+                GUI.contentColor = new Color(1f, 0.92f, 0.45f);
+            }
+            bool clicked = GUILayout.Button(on ? "● " + label : label, GUILayout.MinWidth(120));
+            GUI.backgroundColor = bg;
+            GUI.contentColor = fg;
+            return clicked;
         }
 
         private static void Row(string label, ref string text, Action<double> apply)
@@ -448,7 +560,7 @@ namespace DashboardAlarms
                     a.enabled = en;
                     a.ResetRuntimeTimersOnly();
                 }
-                GUILayout.Label($"[{a.state}] {AlarmManager.Describe(a)} - now {AlarmManager.Format(a.lastValue)}", wrapLabel, GUILayout.ExpandWidth(true));
+                GUILayout.Label($"[{a.state}] {AlarmManager.Describe(a)} - now {AlarmManager.FormatValue(a, a.lastValue)}", wrapLabel, GUILayout.ExpandWidth(true));
                 if (a.IsRaised && GUILayout.Button("Snooze", GUILayout.Width(60)))
                 {
                     AlarmManager.Snooze(a, a.snoozeMinutes);

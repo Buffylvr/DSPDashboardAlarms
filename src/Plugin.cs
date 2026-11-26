@@ -16,7 +16,7 @@ namespace DashboardAlarms
     {
         public const string Guid = "buffylvr.dsp.dashboardalarms";
         public const string Name = "Dashboard Alarms";
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
 
         internal static ManualLogSource Log;
         internal static float UiScale = 1f;
@@ -33,7 +33,7 @@ namespace DashboardAlarms
             sampleSeconds = Config.Bind("General", "SampleSeconds", 2f,
                 "How often (seconds) every alarm checks its chart's value.");
             stockRefreshSeconds = Config.Bind("General", "StockRefreshSeconds", 30f,
-                "How often (seconds) stock alarms ask the game to recount storage. The game counts one planet per tick, so lower values cost more CPU on big saves. Minimum 5.");
+                "How often (seconds) stock and max-production alarms ask the game to recount storage and machines. The game counts one planet per tick, so lower values cost more CPU on big saves. Minimum 5.");
             uiScale = Config.Bind("UI", "Scale", 1f, "Scale of the alarm windows and banner.");
             listHotkey = Config.Bind("UI", "AlarmListHotkey", new KeyboardShortcut(KeyCode.A, KeyCode.LeftControl, KeyCode.LeftShift),
                 "Opens/closes the list of all dashboard alarms.");

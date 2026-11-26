@@ -4,19 +4,28 @@ Adds alarms to the in-game **Dashboard**. Choose a production or storage chart, 
 the mod warns you with a flashing chart border, a banner at the top of the screen and a game
 sound when the rule is broken. The banner and sound work even when the dashboard is closed.
 
-> **Status: v0.1.0, not yet tested in game.** It builds against game version 0.10.35.29151, its
-> alarm logic passes offline tests, and its patch targets have been checked against the game's
-> code. No one has run it in the game yet. Please report problems.
+> **Status: v0.2.0, early testing.** The chart menu entry and the alarm window have been seen
+> working in game (game version 0.10.35.29151). Alarm firing, the banner, sounds and saving are
+> still being tested in game. The alarm logic passes offline tests. Please report problems.
 
 ## What you can watch
 
 | Chart type on the dashboard | Alarm can watch |
 |---|---|
-| Item production chart | Production per minute, consumption per minute, or net (production − consumption) |
+| Item production chart | Production, consumption or net (production − consumption) per minute; **max production** per minute; **use % of max** (consumption ÷ max production) |
 | Item storage chart | Total stock (every storage category the chart shows) |
 
 Each alarm covers the same area as its chart. Set the chart to the whole cluster to watch every
 planet.
+
+Production, consumption and net use the chart's own time setting (1 minute, 10 minutes, 1 hour,
+...), so the alarm sees the same number the chart shows. A chart set to "total" uses 1 minute.
+
+**Max production** is the game's reference rate: the most that every powered machine making the
+item can output per minute, counting proliferator. It is the "reference speed" in the game's
+statistics tooltips. It stays steady when output is held back by full belts or low demand, so
+**use % of max** shows how close demand is to what your factories can make. For example, Space
+Warper, use % of max, Above 90, warns you before demand outgrows your warper factories.
 
 ## Triggers (one per alarm)
 
@@ -35,7 +44,7 @@ Number fields accept `300000`, `300,000`, `300k`, `1.5M` and `2G`.
 
 - The chart's border flashes red on the dashboard. It shows amber while the hold time is running.
 - A red banner at the top of the screen lists every raised alarm and its current value.
-- A built-in game sound plays, and repeats every N seconds if you set a repeat interval.
+- The built-in game sounds you picked play (one or more, together), and repeat every N seconds if you set a repeat interval.
 - **Ack** silences the alarm and stops the flashing until the value recovers. If it breaks the
   rule again after that, it alarms again.
 - **Snooze** silences the alarm completely for its snooze length. If the rule is still broken
@@ -46,7 +55,7 @@ Number fields accept `300000`, `300,000`, `300k`, `1.5M` and `2G`.
 
 1. Open the Dashboard and add an item production or item storage chart the normal way.
 2. Click the chart's menu button and choose **Add alarm...** at the bottom of the menu.
-3. Pick what to watch, the trigger, the threshold, the hold time and the sound, then press **Create**.
+3. Pick what to watch, the trigger, the threshold, the hold time and the sounds, then press **Create**.
 4. Open the same menu entry (**Edit alarm...**) later to change or delete the alarm.
 
 **Ctrl+Shift+A** opens a list of every alarm. From the list you can turn alarms on and off,
@@ -60,7 +69,7 @@ alarm is deleted too.
 | Setting | Default | Meaning |
 |---|---|---|
 | `General.SampleSeconds` | 2 | How often each alarm checks its chart's value |
-| `General.StockRefreshSeconds` | 30 | How often stock alarms ask the game to recount storage. The game counts one planet per tick, so on very large saves a lower number costs more CPU. Minimum 5. |
+| `General.StockRefreshSeconds` | 30 | How often stock and max-production alarms ask the game to recount storage and machines. The game counts one planet per tick, so on very large saves a lower number costs more CPU. Minimum 5. |
 | `UI.Scale` | 1 | Size of the alarm windows and banner |
 | `UI.AlarmListHotkey` | Ctrl+Shift+A | Opens and closes the alarm list |
 

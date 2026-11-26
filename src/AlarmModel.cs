@@ -6,10 +6,12 @@ namespace DashboardAlarms
     /// <summary>Which number of the watched dashboard chart the alarm looks at.</summary>
     public enum AlarmMetric
     {
-        Production = 0,   // items produced per minute
-        Consumption = 1,  // items consumed per minute
-        Net = 2,          // production - consumption per minute
-        Stock = 3,        // items held in storage (storage charts only)
+        Production = 0,    // items produced per minute
+        Consumption = 1,   // items consumed per minute
+        Net = 2,           // production - consumption per minute
+        Stock = 3,         // items held in storage (storage charts only)
+        MaxProduction = 4, // the game's reference rate: most the area's powered machines can make per minute
+        UsePercent = 5,    // consumption as a % of MaxProduction
     }
 
     public enum AlarmTrigger
@@ -26,6 +28,30 @@ namespace DashboardAlarms
         Alarming = 2,     // flashing + sound
         Acknowledged = 3, // still in alarm, silenced until the condition clears
         Snoozed = 4,      // fully suppressed until snoozeUntilTick
+    }
+
+    public static class Metrics
+    {
+        /// <summary>Metrics that need the game's on-demand recount (ProductionExtraInfoCalculator).</summary>
+        public static bool NeedsRecount(AlarmMetric m) => m == AlarmMetric.Stock || NeedsMax(m);
+
+        public static bool NeedsMax(AlarmMetric m) => m == AlarmMetric.MaxProduction || m == AlarmMetric.UsePercent;
+
+        public static string Unit(AlarmMetric m) => m == AlarmMetric.Stock ? "" : m == AlarmMetric.UsePercent ? "%" : "/min";
+
+        public static string Name(AlarmMetric m)
+        {
+            switch (m)
+            {
+                case AlarmMetric.Production: return "production";
+                case AlarmMetric.Consumption: return "consumption";
+                case AlarmMetric.Net: return "net";
+                case AlarmMetric.Stock: return "stock";
+                case AlarmMetric.MaxProduction: return "max production";
+                case AlarmMetric.UsePercent: return "use % of max production";
+                default: return m.ToString();
+            }
+        }
     }
 
     /// <summary>One alarm, attached to one dashboard stat plan. Saved with the game.</summary>
@@ -46,7 +72,8 @@ namespace DashboardAlarms
         public float averageMinutes = 10f;
         public float holdSeconds = 30f;
         public bool playSound = true;
-        public string sound = Sounds.Default;
+        /// <summary>Every sound here plays together when the alarm sounds.</summary>
+        public List<string> sounds = new List<string> { Sounds.Default };
         public float repeatSoundSeconds = 30f; // 0 = sound once per alarm
         public float snoozeMinutes = 10f;      // default length the Snooze button uses
 
@@ -58,13 +85,17 @@ namespace DashboardAlarms
         public double lastValue = double.NaN;
         public double lastAverage = double.NaN;
         public bool hasValue;
+        /// <summary>Last max production read from the game (per minute); valid when hasMax.</summary>
+        public double lastMax = double.NaN;
+        public bool hasMax;
         /// <summary>Being created in the editor: not evaluated or saved until Create is pressed.</summary>
         public bool isDraft;
         public readonly RollingAverage history = new RollingAverage();
 
         public bool IsRaised => state == AlarmState.Alarming || state == AlarmState.Acknowledged;
 
-        public const int SaveVersion = 1;
+        /// <summary>1: single sound. 2: list of sounds.</summary>
+        public const int SaveVersion = 2;
 
         public void Write(BinaryWriter w)
         {
@@ -81,7 +112,11 @@ namespace DashboardAlarms
             w.Write(averageMinutes);
             w.Write(holdSeconds);
             w.Write(playSound);
-            w.Write(sound ?? Sounds.Default);
+            w.Write(sounds.Count);
+            foreach (string s in sounds)
+            {
+                w.Write(s ?? Sounds.Default);
+            }
             w.Write(repeatSoundSeconds);
             w.Write(snoozeMinutes);
         }
@@ -103,12 +138,22 @@ namespace DashboardAlarms
                 averageMinutes = r.ReadSingle(),
                 holdSeconds = r.ReadSingle(),
                 playSound = r.ReadBoolean(),
-                sound = r.ReadString(),
-                repeatSoundSeconds = r.ReadSingle(),
-                snoozeMinutes = r.ReadSingle(),
             };
-            // future versions append fields here, guarded by `version`
-            _ = version;
+            a.sounds.Clear();
+            if (version >= 2)
+            {
+                int n = r.ReadInt32();
+                for (int i = 0; i < n; i++)
+                {
+                    a.sounds.Add(r.ReadString());
+                }
+            }
+            else
+            {
+                a.sounds.Add(r.ReadString());
+            }
+            a.repeatSoundSeconds = r.ReadSingle();
+            a.snoozeMinutes = r.ReadSingle();
             return a;
         }
 
