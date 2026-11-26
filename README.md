@@ -22,7 +22,7 @@ Example: *"Warn me when Space Warper demand reaches 90% of what my warper factor
 
 ## Install
 
-Install with **r2modman** (or the Thunderstore app). BepInEx and DSPModSave are installed with it
+Install from [Thunderstore](https://thunderstore.io/c/dyson-sphere-program/p/buffy5490/DashboardAlarms/) with **r2modman** (or the Thunderstore app). BepInEx and DSPModSave are installed with it
 automatically.
 
 To install by hand, copy `DashboardAlarms.dll` to `BepInEx/plugins/DashboardAlarms/`. You also need
