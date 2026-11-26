@@ -58,6 +58,8 @@ namespace DashboardAlarms
         public double lastValue = double.NaN;
         public double lastAverage = double.NaN;
         public bool hasValue;
+        /// <summary>Being created in the editor: not evaluated or saved until Create is pressed.</summary>
+        public bool isDraft;
         public readonly RollingAverage history = new RollingAverage();
 
         public bool IsRaised => state == AlarmState.Alarming || state == AlarmState.Acknowledged;

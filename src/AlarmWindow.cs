@@ -92,7 +92,7 @@ namespace DashboardAlarms
             else
             {
                 editing = AlarmManager.CreateFor(plan);
-                editing.enabled = false; // not live until Save is pressed
+                editing.isDraft = true; // not live or saved until Create is pressed
                 editingIsNew = true;
                 if (StatReader.SupportsRate(plan))
                 {
@@ -373,10 +373,7 @@ namespace DashboardAlarms
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(editingIsNew ? "Create" : "Done"))
             {
-                if (editingIsNew)
-                {
-                    a.enabled = true;
-                }
+                a.isDraft = false;
                 a.ResetRuntimeTimersOnly();
                 CloseEditor(false);
             }

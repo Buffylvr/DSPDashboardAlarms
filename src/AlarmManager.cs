@@ -131,31 +131,33 @@ namespace DashboardAlarms
                     Alarms.RemoveAt(i);
                     continue;
                 }
-                if (!a.enabled)
+                // NaN = no new sample this round (stock waits for a finished recount)
+                double sample = double.NaN;
+                if (a.metric == AlarmMetric.Stock)
                 {
+                    if (readStock && plan is AstroStorageStatPlan sp && StatReader.TryReadStock(sp, out double stock))
+                    {
+                        sample = stock;
+                    }
+                }
+                else if (plan is AstroItemProductionStatPlan pp && StatReader.TryReadRates(data, pp, out double prod, out double cons))
+                {
+                    sample = a.metric == AlarmMetric.Production ? prod : a.metric == AlarmMetric.Consumption ? cons : prod - cons;
+                }
+
+                if (!a.enabled || a.isDraft)
+                {
+                    // keep showing the live value in the editor, but never alarm
+                    if (!double.IsNaN(sample))
+                    {
+                        a.lastValue = sample;
+                        a.hasValue = true;
+                    }
                     a.state = AlarmState.Normal;
                     a.conditionSinceTick = -1;
                     continue;
                 }
-                if (a.metric == AlarmMetric.Stock)
-                {
-                    if (!readStock)
-                    {
-                        // keep last stock value until a fresh recount finishes
-                        Evaluate(a, now, double.NaN);
-                        continue;
-                    }
-                    if (plan is AstroStorageStatPlan sp && StatReader.TryReadStock(sp, out double stock))
-                    {
-                        Evaluate(a, now, stock);
-                    }
-                    continue;
-                }
-                if (plan is AstroItemProductionStatPlan pp && StatReader.TryReadRates(data, pp, out double prod, out double cons))
-                {
-                    double v = a.metric == AlarmMetric.Production ? prod : a.metric == AlarmMetric.Consumption ? cons : prod - cons;
-                    Evaluate(a, now, v);
-                }
+                Evaluate(a, now, sample);
             }
         }
 
@@ -412,10 +414,21 @@ namespace DashboardAlarms
         public static void Export(BinaryWriter w)
         {
             w.Write(1); // container version
-            w.Write(Alarms.Count);
+            int count = 0;
             foreach (AlarmDefinition a in Alarms)
             {
-                a.Write(w);
+                if (!a.isDraft)
+                {
+                    count++;
+                }
+            }
+            w.Write(count);
+            foreach (AlarmDefinition a in Alarms)
+            {
+                if (!a.isDraft)
+                {
+                    a.Write(w);
+                }
             }
         }
 
