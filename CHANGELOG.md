@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+- Fix: the Settings > Audio options never appeared. The Audio tab keeps labels and controls in two separate
+  columns ("labels" and "comps"); rows are now built by copying the label and the control into their own columns
+  at the same height.
+
 ## 0.6.0
 - Banner lines have a **Remove...** button. It asks "Delete this alarm? ..." with **Delete alarm** / **Keep**,
   so a stray click can't remove an alarm. The dashboard chart is not touched.
