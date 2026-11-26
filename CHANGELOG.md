@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+- Alarm volume defaults to **50%** and is adjustable in the game's Settings > Audio tab ("Dashboard alarm volume"
+  slider with a **Test** button), next to the "play with sound off" checkbox. A note under them says they come from
+  the DashboardAlarms mod. All three are copies of the game's own settings rows, so they match its style.
+- Config: `Sound.AlarmVolumePercent` (0-100, default 50) replaces `Sound.AlarmVolume`.
+
 ## 0.3.0
 - New checkbox in the game's **Settings > Audio** tab: "Dashboard alarms play with sound off" (on by default).
   On: alarms play at `Sound.AlarmVolume` even with the game's master or sound effects volume down or off.

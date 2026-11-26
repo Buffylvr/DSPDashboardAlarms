@@ -330,8 +330,8 @@ namespace DashboardAlarms
             }
         }
 
-        /// <summary>Alarm volume 0..1 (config). Multiplied by the game's master volume only.</summary>
-        public static float AlarmVolume = 1f;
+        /// <summary>Alarm volume 0..1 (config Sound.AlarmVolumePercent / 100).</summary>
+        public static float AlarmVolume = 0.5f;
 
         private static AudioSource alarmSource;
 
@@ -344,7 +344,7 @@ namespace DashboardAlarms
             if (diagnose)
             {
                 Plugin.Log?.LogInfo($"Sound test: {names.Count} sound(s) [{string.Join(", ", names.ToArray())}]; "
-                    + $"alarm volume {AlarmVolume:0.##}, play with sound off {Plugin.PlayWithSoundOff}, game master {VFAudio.audioVolume:0.##}, game effects {VFAudio.soundVolume:0.##}, final x{GameVolumeFactor():0.##}; "
+                    + $"alarm volume {AlarmVolume:0.##}, play with sound off {Plugin.PlayWithSoundOff}, game master {VFAudio.audioVolume:0.##}, game effects {VFAudio.soundVolume:0.##}, final x{GameVolumeFactor(Plugin.PlayWithSoundOff):0.##}; "
                     + $"listener volume {AudioListener.volume:0.##}, background mute {VFAudio.backgroundMute}, focused {Application.isFocused}");
             }
             foreach (string n in names)
@@ -358,7 +358,10 @@ namespace DashboardAlarms
         /// scales by the Sound Effects slider, so players who turn effects off would never hear an
         /// alarm; this uses AlarmVolume x the game's master volume instead.
         /// </summary>
-        public static void PlaySound(string name, bool diagnose = false)
+        public static void PlaySound(string name, bool diagnose = false) => PlaySound(name, AlarmVolume, Plugin.PlayWithSoundOff, diagnose);
+
+        /// <summary>Plays at an explicit volume/mode (the Settings screen previews unsaved values).</summary>
+        public static void PlaySound(string name, float alarmVolume, bool playWithSoundOff, bool diagnose = false)
         {
             if (string.IsNullOrEmpty(name))
             {
@@ -383,7 +386,7 @@ namespace DashboardAlarms
                     return;
                 }
                 AudioSource src = EnsureSource();
-                float volume = Mathf.Clamp01(AlarmVolume) * GameVolumeFactor() * (proto.Volume > 0 ? proto.Volume : 1f);
+                float volume = Mathf.Clamp01(alarmVolume) * GameVolumeFactor(playWithSoundOff) * (proto.Volume > 0 ? proto.Volume : 1f);
                 src.PlayOneShot(clip, volume);
                 if (diagnose)
                 {
@@ -397,9 +400,9 @@ namespace DashboardAlarms
         }
 
         /// <summary>1 when alarms play through muted game audio; otherwise the game's master x sound effects volume.</summary>
-        internal static float GameVolumeFactor()
+        internal static float GameVolumeFactor(bool playWithSoundOff)
         {
-            return Plugin.PlayWithSoundOff ? 1f : Mathf.Clamp01(VFAudio.audioVolume) * Mathf.Clamp01(VFAudio.soundVolume);
+            return playWithSoundOff ? 1f : Mathf.Clamp01(VFAudio.audioVolume) * Mathf.Clamp01(VFAudio.soundVolume);
         }
 
         private static AudioSource EnsureSource()
