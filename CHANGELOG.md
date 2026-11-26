@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+- Fix: wrapped text (the delete confirmation, long alarm lines, the editor's notes) was clipped with the game's
+  font, because Unity under-measures wrapped text in that font. Lines are now counted word by word.
+
 ## 0.7.1
 - Fix: with several alarms, the "Delete this alarm?" confirmation was cut off at the bottom of the banner. The
   banner now sizes itself from the height its content actually took, not an estimate.

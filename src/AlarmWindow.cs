@@ -253,12 +253,12 @@ namespace DashboardAlarms
                 if (line.Key == confirmRemove)
                 {
                     confirmShown = true;
-                    rowsH += bannerLineStyle.CalcHeight(new GUIContent(RemoveQuestion(line.Key)), inner) + gap
+                    rowsH += WrappedHeight(bannerLineStyle, RemoveQuestion(line.Key), inner - bannerLineStyle.margin.horizontal) + gap
                         + button.CalcHeight(new GUIContent(RemoveYes), 80) + gap;
                     continue;
                 }
                 float labelW = inner - RowButtonsWidth(button, line.Key) - gap;
-                rowsH += Mathf.Max(button.CalcHeight(new GUIContent("x"), 80), LineStyle(line.Key).CalcHeight(new GUIContent(line.Value), labelW)) + gap;
+                rowsH += Mathf.Max(button.CalcHeight(new GUIContent("x"), 80), WrappedHeight(LineStyle(line.Key), line.Value, labelW)) + gap;
             }
             if (!confirmShown)
             {
@@ -313,7 +313,8 @@ namespace DashboardAlarms
                 AlarmDefinition a = line.Key;
                 if (a == confirmRemove)
                 {
-                    GUILayout.Label(RemoveQuestion(a), bannerLineStyle, GUILayout.Width(inner - bannerLineStyle.margin.horizontal));
+                    float qW = inner - bannerLineStyle.margin.horizontal;
+                    GUILayout.Label(RemoveQuestion(a), bannerLineStyle, GUILayout.Width(qW), GUILayout.Height(WrappedHeight(bannerLineStyle, RemoveQuestion(a), qW)));
                     GUILayout.Space(gap);
                     GUILayout.BeginHorizontal();
                     GUILayout.FlexibleSpace();
@@ -338,7 +339,7 @@ namespace DashboardAlarms
                 string action = RowAction(a);
                 float labelW = inner - RowButtonsWidth(button, a) - gap;
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(line.Value, LineStyle(a), GUILayout.Width(labelW));
+                GUILayout.Label(line.Value, LineStyle(a), GUILayout.Width(labelW), GUILayout.Height(WrappedHeight(LineStyle(a), line.Value, labelW)));
                 GUILayout.Space(gap);
                 if (GUILayout.Button(action, GUILayout.Width(ButtonWidth(button, action))))
                 {
@@ -384,6 +385,54 @@ namespace DashboardAlarms
 
         /// <summary>Height of the banner's content as last drawn (0 until the first repaint).</summary>
         private static float bannerContentH;
+
+        private static readonly Dictionary<GUIStyle, GUIStyle> singleLine = new Dictionary<GUIStyle, GUIStyle>();
+
+        /// <summary>A full-width wrapped label in the editor window, tall enough for every line.</summary>
+        private static void Note(string text, GUIStyle style)
+        {
+            float width = editorRect.width - GUI.skin.window.padding.horizontal - style.margin.horizontal;
+            GUILayout.Label(text, style, GUILayout.Height(WrappedHeight(style, text, width)));
+        }
+
+        /// <summary>
+        /// Height a word-wrapped label needs at this width. GUIStyle.CalcHeight under-measures wrapped text
+        /// with the game's font, so the lines are counted here by wrapping word by word with single-line
+        /// measurements (which are accurate), with a little slack per line.
+        /// </summary>
+        private static float WrappedHeight(GUIStyle style, string text, float width)
+        {
+            if (!singleLine.TryGetValue(style, out GUIStyle one))
+            {
+                one = new GUIStyle(style) { wordWrap = false };
+                singleLine[style] = one;
+            }
+            float pad = style.padding.horizontal;
+            float avail = Mathf.Max(20f, width - pad);
+            float lineH = one.CalcSize(new GUIContent("Ag")).y - style.padding.vertical;
+            float spaceW = one.CalcSize(new GUIContent("a a")).x - one.CalcSize(new GUIContent("aa")).x;
+            int lines = 1;
+            float x = 0;
+            foreach (string word in (text ?? "").Split(' '))
+            {
+                if (word.Length == 0)
+                {
+                    continue;
+                }
+                float w = one.CalcSize(new GUIContent(word)).x - pad;
+                if (x > 0 && x + spaceW + w > avail)
+                {
+                    lines++;
+                    x = w;
+                }
+                else
+                {
+                    x += (x > 0 ? spaceW : 0) + w;
+                }
+            }
+            float counted = lines * lineH * 1.15f + style.padding.vertical + 2;
+            return Mathf.Max(style.CalcHeight(new GUIContent(text), width), counted);
+        }
 
         // Removing an alarm from the banner: a two-step "Remove..." -> "Delete alarm" / "Keep" so one stray click can't do it.
         private const string RemoveAsk = "Remove...";
@@ -441,7 +490,7 @@ namespace DashboardAlarms
                 return;
             }
 
-            GUILayout.Label($"Chart: {plan.displayName}  -  {StatReader.ItemName(a.itemId)}, {StatReader.AreaName(GameMain.data, a.astroFilter)}", wrapLabel);
+            Note($"Chart: {plan.displayName}  -  {StatReader.ItemName(a.itemId)}, {StatReader.AreaName(GameMain.data, a.astroFilter)}", wrapLabel);
             GUILayout.Space(4);
 
             a.enabled = GameSkin.Toggle(a.enabled, "Alarm enabled");
@@ -467,13 +516,13 @@ namespace DashboardAlarms
                 switch (a.metric)
                 {
                     case AlarmMetric.MaxProduction:
-                        GUILayout.Label("The most this area's powered machines can make per minute, counting proliferator: the game's reference rate.", GameSkin.DimLabel);
+                        Note("The most this area's powered machines can make per minute, counting proliferator: the game's reference rate.", GameSkin.DimLabel);
                         break;
                     case AlarmMetric.UsePercent:
-                        GUILayout.Label($"Consumption ({window} average{note}) as a % of max production. 90 means you are using 90% of what your machines can make.", GameSkin.DimLabel);
+                        Note($"Consumption ({window} average{note}) as a % of max production. 90 means you are using 90% of what your machines can make.", GameSkin.DimLabel);
                         break;
                     default:
-                        GUILayout.Label($"Uses the chart's {window} average{note}, the same number the chart shows.", GameSkin.DimLabel);
+                        Note($"Uses the chart's {window} average{note}, the same number the chart shows.", GameSkin.DimLabel);
                         break;
                 }
             }
@@ -520,7 +569,7 @@ namespace DashboardAlarms
             a.playSound = GameSkin.Toggle(a.playSound, "Play sound");
             if (a.playSound)
             {
-                GUILayout.Label("Sounds (pick one or more; they play together)", GameSkin.DimLabel);
+                Note("Sounds (pick one or more; they play together)", GameSkin.DimLabel);
                 int n = Sounds.Options.GetLength(0);
                 for (int i = 0; i < n; i++)
                 {
@@ -570,11 +619,11 @@ namespace DashboardAlarms
             string max = a.metric == AlarmMetric.UsePercent && a.hasMax ? $"   (max production {AlarmManager.Format(a.lastMax)}/min)" : "";
             if (Metrics.NeedsRecount(a.metric) && !a.hasValue)
             {
-                GUILayout.Label("Now: waiting for the game to count machines and storage (a few seconds)...", GameSkin.DimLabel);
+                Note("Now: waiting for the game to count machines and storage (a few seconds)...", GameSkin.DimLabel);
             }
             else
             {
-                GUILayout.Label($"Now: {AlarmManager.FormatValue(a, a.lastValue)}{max}{avg}   state: {a.state}", wrapLabel);
+                Note($"Now: {AlarmManager.FormatValue(a, a.lastValue)}{max}{avg}   state: {a.state}", wrapLabel);
             }
 
             GUILayout.Space(6);
