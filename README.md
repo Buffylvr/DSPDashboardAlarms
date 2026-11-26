@@ -6,6 +6,17 @@ screen and a sound. The banner and sound work even when the Dashboard is closed.
 
 Example: *"Warn me when Space Warper demand reaches 90% of what my warper factories can make."*
 
+**The alarm banner** lists every alarm with its current value. It shows even when the Dashboard is
+closed.
+
+![Alarm banner with two alarms](https://raw.githubusercontent.com/Buffylvr/DSPDashboardAlarms/main/docs/screenshots/banner.png)
+
+**Add an alarm** from any production or storage chart's menu, then set it up in the alarm window.
+
+![Add alarm... in a Dashboard chart's menu](https://raw.githubusercontent.com/Buffylvr/DSPDashboardAlarms/main/docs/screenshots/chart-menu.png)
+
+![The alarm editor](https://raw.githubusercontent.com/Buffylvr/DSPDashboardAlarms/main/docs/screenshots/editor.png)
+
 ## Features
 
 - **Watch** production, consumption, net, **max production** or **use % of max** on item production

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+- README: screenshots of the alarm banner, the chart menu entry and the alarm editor, and a link to the
+  Thunderstore page. No code changes.
+
 ## 1.0.0
 - First public release (Thunderstore). Everything below has been tested in game on 0.10.35.29151.
 - README rewritten for players; Thunderstore icon.
